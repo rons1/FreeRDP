@@ -38,10 +38,10 @@
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/client/channels.h>
 #include <freerdp/channels/channels.h>
+#include <freerdp/log.h>
 
 #include <winpr/crt.h>
 #include <winpr/synch.h>
-#include <freerdp/log.h>
 
 #include "pf_channels.h"
 #include "pf_gdi.h"
@@ -107,6 +107,15 @@ static void pf_OnErrorInfo(void* ctx, ErrorInfoEventArgs* e)
 	}
 }
 
+
+static BOOL pf_client_remote_monitors(rdpContext* context, UINT32 count,
+                                      const MONITOR_DEF* monitors)
+{
+	pClientContext* pc = (pClientContext*) context;
+	proxyData* pdata = pc->pdata;
+	rdpContext* ps = (rdpContext*)pdata->ps;
+	return freerdp_display_send_monitor_layout(ps, count, monitors);
+}
 
 /**
  * Called before a connection is established.
@@ -214,6 +223,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	update->EndPaint = pf_client_end_paint;
 	update->BitmapUpdate = pf_client_bitmap_update;
 	update->DesktopResize = pf_client_desktop_resize;
+	update->RemoteMonitors = pf_client_remote_monitors;
 	ps = (rdpContext*) pc->pdata->ps;
 	proxy_server_reactivate(ps, context);
 	return TRUE;
