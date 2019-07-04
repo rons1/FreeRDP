@@ -337,20 +337,6 @@ static UINT rail_client_system_param(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_server_system_param(RailClientContext* context,
-                                     const RAIL_SYSPARAM_ORDER* sysparam)
-{
-	if (!context || !sysparam)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
 static UINT rail_client_system_command(RailClientContext* context,
                                        const RAIL_SYSCOMMAND_ORDER* syscommand)
 {
@@ -385,37 +371,6 @@ static UINT rail_client_handshake(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_server_handshake(RailClientContext* context,
-                                  const RAIL_HANDSHAKE_ORDER* handshake)
-{
-	if (!context || !handshake)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_server_handshake_ex(RailClientContext* context,
-                                     const RAIL_HANDSHAKE_EX_ORDER* handshakeEx)
-{
-	railPlugin* rail;
-
-	if (!context || !handshakeEx)
-		return ERROR_INVALID_PARAMETER;
-
-	rail = (railPlugin*) context->handle;
-	return CHANNEL_RC_OK;
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
 static UINT rail_client_notify_event(RailClientContext* context,
                                      const RAIL_NOTIFY_EVENT_ORDER* notifyEvent)
 {
@@ -443,34 +398,6 @@ static UINT rail_client_window_move(RailClientContext* context,
 
 	rail = (railPlugin*) context->handle;
 	return rail_send_client_window_move_order(rail, windowMove);
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_server_local_move_size(RailClientContext* context,
-                                        const RAIL_LOCALMOVESIZE_ORDER* localMoveSize)
-{
-	if (!context || !localMoveSize)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_server_min_max_info(RailClientContext* context,
-                                     const RAIL_MINMAXINFO_ORDER* minMaxInfo)
-{
-	if (!context || !minMaxInfo)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
 }
 
 /**
@@ -524,20 +451,6 @@ static UINT rail_client_language_bar_info(RailClientContext* context,
 	return rail_send_client_langbar_info_order(rail, langBarInfo);
 }
 
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_server_language_bar_info(RailClientContext* context,
-        const RAIL_LANGBAR_INFO_ORDER* langBarInfo)
-{
-	if (!context || !langBarInfo)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
-}
-
 static UINT rail_client_language_ime_info(RailClientContext* context,
         const RAIL_LANGUAGEIME_INFO_ORDER* langImeInfo)
 {
@@ -555,22 +468,8 @@ static UINT rail_client_language_ime_info(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_server_execute_result(RailClientContext* context,
-                                       const RAIL_EXEC_RESULT_ORDER* execResult)
-{
-	if (!context || !execResult)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_client_get_appid_request(RailClientContext* context,
-        const RAIL_GET_APPID_REQ_ORDER* getAppIdReq)
+static UINT rail_client_get_appid_req(RailClientContext* context,
+                                      const RAIL_GET_APPID_REQ_ORDER* getAppIdReq)
 {
 	railPlugin* rail;
 
@@ -603,20 +502,6 @@ static UINT rail_client_snap_arrange(RailClientContext* context,
 
 	rail = (railPlugin*) context->handle;
 	return rail_send_client_order_snap_arrange_order(rail, snap);
-}
-
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT rail_server_get_appid_response(RailClientContext* context,
-        const RAIL_GET_APPID_RESP_ORDER* getAppIdResp)
-{
-	if (!context || !getAppIdResp)
-		return ERROR_INVALID_PARAMETER;
-
-	return CHANNEL_RC_OK; /* stub - should be registered by client */
 }
 
 /**
@@ -941,23 +826,15 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 		context->ClientExecute = rail_client_execute;
 		context->ClientActivate = rail_client_activate;
 		context->ClientSystemParam = rail_client_system_param;
-		context->ServerSystemParam = rail_server_system_param;
 		context->ClientSystemCommand = rail_client_system_command;
 		context->ClientHandshake = rail_client_handshake;
-		context->ServerHandshake = rail_server_handshake;
-		context->ServerHandshakeEx = rail_server_handshake_ex;
 		context->ClientNotifyEvent = rail_client_notify_event;
 		context->ClientWindowMove = rail_client_window_move;
-		context->ServerLocalMoveSize = rail_server_local_move_size;
-		context->ServerMinMaxInfo = rail_server_min_max_info;
 		context->ClientInformation = rail_client_information;
 		context->ClientSystemMenu = rail_client_system_menu;
 		context->ClientLanguageBarInfo = rail_client_language_bar_info;
-		context->ServerLanguageBarInfo = rail_server_language_bar_info;
 		context->ClientLanguageIMEInfo = rail_client_language_ime_info;
-		context->ServerExecuteResult = rail_server_execute_result;
 		context->ClientGetAppIdRequest = rail_client_get_appid_request;
-		context->ServerGetAppIdResponse = rail_server_get_appid_response;
 		context->ClientSnapArrange = rail_client_snap_arrange;
 		context->ClientCloak = rail_client_cloak;
 		rail->rdpcontext = pEntryPointsEx->context;
