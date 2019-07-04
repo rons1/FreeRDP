@@ -143,7 +143,7 @@ static UINT rail_read_server_exec_result_order(wStream* s, RAIL_EXEC_RESULT_ORDE
 	if (!s || !execResult)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 8)
+	if (Stream_GetRemainingLength(s) < RAIL_EXEC_RESULT_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -204,7 +204,7 @@ static UINT rail_read_server_minmaxinfo_order(wStream* s, RAIL_MINMAXINFO_ORDER*
 	if (!s || !minmaxinfo)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 20)
+	if (Stream_GetRemainingLength(s) < RAIL_MINMAXINFO_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -235,7 +235,7 @@ static UINT rail_read_server_localmovesize_order(wStream* s,
 	if (!s || !localMoveSize)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 12)
+	if (Stream_GetRemainingLength(s) < RAIL_LOCALMOVESIZE_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -261,14 +261,15 @@ static UINT rail_read_server_get_appid_resp_order(wStream* s,
 	if (!s || !getAppidResp)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 516)
+	if (Stream_GetRemainingLength(s) < RAIL_GET_APPID_RESP_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
 	}
 
 	Stream_Read_UINT32(s, getAppidResp->windowId); /* windowId (4 bytes) */
-	Stream_Read(s, (BYTE*) & (getAppidResp->applicationId), 512); /* applicationId (256 UNICODE chars) */
+	Stream_Read(s, (BYTE*) & (getAppidResp->applicationId),
+	            512); /* applicationId (256 UNICODE chars) */
 	return CHANNEL_RC_OK;
 }
 
@@ -282,7 +283,7 @@ static UINT rail_read_langbar_info_order(wStream* s, RAIL_LANGBAR_INFO_ORDER* la
 	if (!s || !langbarInfo)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 4)
+	if (Stream_GetRemainingLength(s) < RAIL_LANGBAR_INFO_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -846,7 +847,7 @@ static UINT rail_read_taskbar_info_order(wStream* s, RAIL_TASKBAR_INFO_ORDER* ta
 	if (!s || !taskbarInfo)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 12)
+	if (Stream_GetRemainingLength(s) < RAIL_TASKBAR_INFO_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -895,7 +896,7 @@ static UINT rail_read_zorder_sync_order(wStream* s, RAIL_ZORDER_SYNC* zorder)
 	if (!s || !zorder)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 4)
+	if (Stream_GetRemainingLength(s) < RAIL_Z_ORDER_SYNC_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -939,7 +940,7 @@ static UINT rail_read_order_cloak(wStream* s, RAIL_CLOAK* cloak)
 	if (!s || !cloak)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 5)
+	if (Stream_GetRemainingLength(s) < RAIL_CLOAK_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
@@ -986,7 +987,7 @@ static UINT rail_read_power_display_request_order(wStream* s, RAIL_POWER_DISPLAY
 	if (!s || !power)
 		return ERROR_INVALID_PARAMETER;
 
-	if (Stream_GetRemainingLength(s) < 4)
+	if (Stream_GetRemainingLength(s) < RAIL_POWER_DISPLAY_REQUEST_ORDER_LENGTH)
 	{
 		WLog_ERR(TAG, "Stream_GetRemainingLength failed!");
 		return ERROR_INVALID_DATA;
