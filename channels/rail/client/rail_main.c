@@ -468,7 +468,7 @@ static UINT rail_client_compartment_info(RailClientContext* context,
 }
 
 static UINT rail_client_cloak(RailClientContext* context,
-                              const RAIL_CLOAK* cloak)
+                              const RAIL_CLOAK_ORDER* cloak)
 {
 	railPlugin* rail;
 
@@ -476,7 +476,7 @@ static UINT rail_client_cloak(RailClientContext* context,
 		return ERROR_INVALID_PARAMETER;
 
 	rail = (railPlugin*) context->handle;
-	return rail_send_client_order_cloak_order(rail, cloak);
+	return rail_send_client_cloak_order(rail, cloak);
 }
 
 static UINT rail_client_snap_arrange(RailClientContext* context,
