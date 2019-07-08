@@ -216,8 +216,8 @@ static UINT rail_send_client_sysparam(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_client_system_param(RailClientContext* context,
-                                     const RAIL_SYSPARAM_ORDER* sysInParam)
+static UINT rail_client_sysparam(RailClientContext* context,
+                                 const RAIL_SYSPARAM_ORDER* sysInParam)
 {
 	UINT error = CHANNEL_RC_OK;
 	RAIL_SYSPARAM_ORDER sysparam;
@@ -312,8 +312,8 @@ static UINT rail_client_system_param(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_client_system_command(RailClientContext* context,
-                                       const RAIL_SYSCOMMAND_ORDER* syscommand)
+static UINT rail_client_syscommand(RailClientContext* context,
+                                   const RAIL_SYSCOMMAND_ORDER* syscommand)
 {
 	railPlugin* rail;
 
@@ -380,8 +380,8 @@ static UINT rail_client_window_move(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_client_information(RailClientContext* context,
-                                    const RAIL_CLIENT_STATUS_ORDER* clientStatus)
+static UINT rail_client_client_status(RailClientContext* context,
+                                      const RAIL_CLIENT_STATUS_ORDER* clientStatus)
 {
 	railPlugin* rail;
 
@@ -389,7 +389,7 @@ static UINT rail_client_information(RailClientContext* context,
 		return ERROR_INVALID_PARAMETER;
 
 	rail = (railPlugin*) context->handle;
-	return rail_send_client_status_order(rail, clientStatus);
+	return rail_send_client_client_status_order(rail, clientStatus);
 }
 
 /**
@@ -397,8 +397,8 @@ static UINT rail_client_information(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_client_system_menu(RailClientContext* context,
-                                    const RAIL_SYSMENU_ORDER* sysmenu)
+static UINT rail_client_sysmenu(RailClientContext* context,
+                                const RAIL_SYSMENU_ORDER* sysmenu)
 {
 	railPlugin* rail;
 
@@ -414,8 +414,8 @@ static UINT rail_client_system_menu(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT rail_client_language_bar_info(RailClientContext* context,
-        const RAIL_LANGBAR_INFO_ORDER* langBarInfo)
+static UINT rail_client_langbar_info(RailClientContext* context,
+                                     const RAIL_LANGBAR_INFO_ORDER* langBarInfo)
 {
 	railPlugin* rail;
 
@@ -480,7 +480,7 @@ static UINT rail_client_cloak(RailClientContext* context,
 }
 
 static UINT rail_client_snap_arrange(RailClientContext* context,
-                                     const RAIL_SNAP_ARRANGE* snap)
+                                     const RAIL_SNAP_ARRANGE_ORDER* snap)
 {
 	railPlugin* rail;
 
@@ -488,7 +488,7 @@ static UINT rail_client_snap_arrange(RailClientContext* context,
 		return ERROR_INVALID_PARAMETER;
 
 	rail = (railPlugin*) context->handle;
-	return rail_send_client_order_snap_arrange_order(rail, snap);
+	return rail_send_client_snap_arrange_order(rail, snap);
 }
 
 /**
@@ -810,19 +810,20 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 
 		context->handle = (void*) rail;
 		context->custom = NULL;
-		context->ClientActivate = rail_client_activate;
-		context->ClientSystemParam = rail_client_system_param;
-		context->ClientSystemCommand = rail_client_system_command;
+		/* Register client side order sending callbacks */
 		context->ClientHandshake = rail_client_handshake;
+		context->ClientClientStatus = rail_client_client_status;
 		context->ClientExec = rail_client_exec;
+		context->ClientSysparam = rail_client_sysparam;
+		context->ClientActivate = rail_client_activate;
+		context->ClientSysmenu = rail_client_sysmenu;
+		context->ClientSyscommand = rail_client_syscommand;
 		context->ClientNotifyEvent = rail_client_notify_event;
+		context->ClientGetAppidReq = rail_client_get_appid_req;
 		context->ClientWindowMove = rail_client_window_move;
-		context->ClientInformation = rail_client_information;
-		context->ClientSystemMenu = rail_client_system_menu;
-		context->ClientLanguageBarInfo = rail_client_language_bar_info;
-		context->ClientLanguageIMEInfo = rail_client_language_ime_info;
-		context->ClientGetAppIdRequest = rail_client_get_appid_request;
 		context->ClientSnapArrange = rail_client_snap_arrange;
+		context->ClientLangbarInfo = rail_client_langbar_info;
+		context->ClientLanguageImeInfo = rail_client_language_ime_info;
 		context->ClientCompartmentInfo = rail_client_compartment_info;
 		context->ClientCloak = rail_client_cloak;
 		rail->rdpcontext = pEntryPointsEx->context;

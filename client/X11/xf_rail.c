@@ -124,7 +124,7 @@ void xf_rail_send_client_system_command(xfContext* xfc, UINT32 windowId,
 	RAIL_SYSCOMMAND_ORDER syscommand;
 	syscommand.windowId = windowId;
 	syscommand.command = command;
-	xfc->rail->ClientSystemCommand(xfc->rail, &syscommand);
+	xfc->rail->ClientSyscommand(xfc->rail, &syscommand);
 }
 
 /**
@@ -813,8 +813,8 @@ static void xf_rail_register_update_callbacks(rdpUpdate* update)
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT xf_rail_server_execute_result(RailClientContext* context,
-        const RAIL_EXEC_RESULT_ORDER* execResult)
+static UINT xf_rail_server_exec_result(RailClientContext* context,
+                                       const RAIL_EXEC_RESULT_ORDER* execResult)
 {
 	xfContext* xfc = (xfContext*) context->custom;
 
@@ -862,7 +862,7 @@ static UINT xf_rail_server_start_cmd(RailClientContext* context)
 	clientStatus.flags |= TS_RAIL_CLIENTSTATUS_APPBAR_REMOTING_SUPPORTED;
 	clientStatus.flags |= TS_RAIL_CLIENTSTATUS_POWER_DISPLAY_REQUEST_SUPPORTED;
 	clientStatus.flags |= TS_RAIL_CLIENTSTATUS_BIDIRECTIONAL_CLOAK_SUPPORTED;
-	status = context->ClientInformation(context, &clientStatus);
+	status = context->ClientClientStatus(context, &clientStatus);
 
 	if (status != CHANNEL_RC_OK)
 		return status;
@@ -871,7 +871,7 @@ static UINT xf_rail_server_start_cmd(RailClientContext* context)
 	{
 		RAIL_LANGBAR_INFO_ORDER langBarInfo;
 		langBarInfo.languageBarStatus = 0x00000008; /* TF_SFT_HIDDEN */
-		status = context->ClientLanguageBarInfo(context, &langBarInfo);
+		status = context->ClientLangbarInfo(context, &langBarInfo);
 
 		if (status != CHANNEL_RC_OK)
 			return status;
@@ -896,7 +896,7 @@ static UINT xf_rail_server_start_cmd(RailClientContext* context)
 	sysparam.workArea.right = settings->DesktopWidth;
 	sysparam.workArea.bottom = settings->DesktopHeight;
 	sysparam.dragFullWindows = FALSE;
-	status = context->ClientSystemParam(context, &sysparam);
+	status = context->ClientSysparam(context, &sysparam);
 
 	if (status != CHANNEL_RC_OK)
 		return status;
@@ -1116,14 +1116,14 @@ int xf_rail_init(xfContext* xfc, RailClientContext* rail)
 	xfc->rail = rail;
 	xf_rail_register_update_callbacks(context->update);
 	rail->custom = (void*) xfc;
-	rail->ServerExecuteResult = xf_rail_server_execute_result;
-	rail->ServerSystemParam = xf_rail_server_system_param;
+	rail->ServerExecResult = xf_rail_server_exec_result;
+	rail->ServerSysparam = xf_rail_server_system_param;
 	rail->ServerHandshake = xf_rail_server_handshake;
 	rail->ServerHandshakeEx = xf_rail_server_handshake_ex;
 	rail->ServerLocalMoveSize = xf_rail_server_local_move_size;
 	rail->ServerMinMaxInfo = xf_rail_server_min_max_info;
-	rail->ServerLanguageBarInfo = xf_rail_server_language_bar_info;
-	rail->ServerGetAppIdResponse = xf_rail_server_get_appid_response;
+	rail->ServerLangbarInfo = xf_rail_server_language_bar_info;
+	rail->ServerGetAppidResp = xf_rail_server_get_appid_response;
 	xfc->railWindows = HashTable_New(TRUE);
 
 	if (!xfc->railWindows)

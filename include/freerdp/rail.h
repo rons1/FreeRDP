@@ -341,8 +341,8 @@ typedef struct _RAIL_ACTIVATE_ORDER RAIL_ACTIVATE_ORDER;
 struct _RAIL_SYSMENU_ORDER
 {
 	UINT32 windowId;
-	UINT16 left;
-	UINT16 top;
+	INT16 left;
+	INT16 top;
 };
 typedef struct _RAIL_SYSMENU_ORDER RAIL_SYSMENU_ORDER;
 
@@ -419,15 +419,15 @@ struct _RAIL_COMPARTMENT_INFO_ORDER
 	UINT32 ImeState;
 	UINT32 ImeConvMode;
 	UINT32 ImeSentenceMode;
-	UINT32 KanaMode;
+	UINT32 KANAMode;
 };
 typedef struct _RAIL_COMPARTMENT_INFO_ORDER RAIL_COMPARTMENT_INFO_ORDER;
 
-struct _RAIL_ZORDER_SYNC
+struct _RAIL_ZORDER_SYNC_ORDER
 {
 	UINT32 windowIdMarker;
 };
-typedef struct _RAIL_ZORDER_SYNC RAIL_ZORDER_SYNC;
+typedef struct _RAIL_ZORDER_SYNC_ORDER RAIL_ZORDER_SYNC_ORDER;
 
 struct _RAIL_CLOAK_ORDER
 {
@@ -460,7 +460,7 @@ struct _RAIL_LANGUAGEIME_INFO_ORDER
 };
 typedef struct _RAIL_LANGUAGEIME_INFO_ORDER RAIL_LANGUAGEIME_INFO_ORDER;
 
-struct _RAIL_SNAP_ARRANGE
+struct _RAIL_SNAP_ARRANGE_ORDER
 {
 	UINT32 windowId;
 	UINT16 left;
@@ -468,16 +468,16 @@ struct _RAIL_SNAP_ARRANGE
 	UINT16 right;
 	UINT16 bottom;
 };
-typedef struct _RAIL_SNAP_ARRANGE RAIL_SNAP_ARRANGE;
+typedef struct _RAIL_SNAP_ARRANGE_ORDER RAIL_SNAP_ARRANGE_ORDER;
 
-struct _RAIL_GET_APPID_RESP_EX
+struct _RAIL_GET_APPID_RESP_EX_ORDER
 {
 	UINT32 windowID;
 	WCHAR applicationID[512 / sizeof(WCHAR)];
 	UINT32 processId;
-	WCHAR processImageName[512 / sizeof(WCHAR)];
+	WCHAR processImageName[520 / sizeof(WCHAR)];
 };
-typedef struct _RAIL_GET_APPID_RESP_EX RAIL_GET_APPID_RESP_EX;
+typedef struct _RAIL_GET_APPID_RESP_EX_ORDER RAIL_GET_APPID_RESP_EX_ORDER;
 
 /* DEPRECATED: RAIL Constants
  * use the spec conformant naming scheme TS_ below
