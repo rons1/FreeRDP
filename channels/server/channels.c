@@ -52,6 +52,7 @@
 #include <freerdp/server/rail.h>
 #include <freerdp/server/rdpgfx.h>
 #include <freerdp/server/disp.h>
+#include <freerdp/server/mfa.h>
 
 void freerdp_channels_dummy(void)
 {
@@ -67,6 +68,11 @@ void freerdp_channels_dummy(void)
 	RailServerContext* rail;
 	RdpgfxServerContext* rdpgfx;
 	DispServerContext* disp;
+#ifdef WITH_MFA
+	MfaServerContext *mfa;
+	mfa = mfa_server_context_new(NULL);
+	mfa_server_context_free(mfa);
+#endif
 	audin = audin_server_context_new(NULL);
 	audin_server_context_free(audin);
 	rdpsnd = rdpsnd_server_context_new(NULL);
