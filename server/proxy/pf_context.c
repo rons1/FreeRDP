@@ -66,6 +66,7 @@ BOOL init_p_server_context(freerdp_peer* client)
 void pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src, BOOL is_server)
 {
 	rdpSettings* before_copy = freerdp_settings_clone(dst);
+
 	if (!before_copy)
 		return;
 
@@ -84,7 +85,6 @@ void pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src, BOOL is_
 	free(dst->CertificateName);
 	free(dst->CertificateContent);
 	free(dst->ClientRandom);
-
 	/* adjust pointer to instance pointer */
 	dst->ServerMode = is_server;
 	dst->ConfigPath = _strdup(before_copy->ConfigPath);
@@ -107,7 +107,6 @@ void pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src, BOOL is_
 	{
 		/* adjust instance pointer for client's context */
 		dst->instance = before_copy->instance;
-
 		/* RdpServerRsaKey must be set to NULL if `dst` is client's context */
 		dst->RdpServerRsaKey = NULL;
 	}
@@ -191,6 +190,7 @@ out_fail:
 void proxy_data_free(proxyData* pdata)
 {
 	connection_info_free(pdata->info);
+
 	if (pdata->abort_event)
 	{
 		CloseHandle(pdata->abort_event);

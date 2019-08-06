@@ -49,6 +49,7 @@
 #include "pf_context.h"
 #include "pf_update.h"
 #include "pf_log.h"
+#include "pf_update.h"
 
 #define TAG PROXY_TAG("client")
 

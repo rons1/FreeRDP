@@ -44,9 +44,8 @@ static BOOL pf_server_keyboard_event(rdpInput* input, UINT16 flags, UINT16 code)
 
 	event.flags = flags;
 	event.rdp_scan_code = code;
-
 	RUN_FILTER(config->Filters, FILTER_TYPE_KEYBOARD, ps->pdata->info, &event, result,
-	                  freerdp_input_send_keyboard_event, context->input, flags, code);
+	           freerdp_input_send_keyboard_event, context->input, flags, code);
 	return result;
 }
 
@@ -78,9 +77,8 @@ static BOOL pf_server_mouse_event(rdpInput* input, UINT16 flags, UINT16 x, UINT1
 	event.flags = flags;
 	event.x = x;
 	event.y = y;
-
 	RUN_FILTER(config->Filters, FILTER_TYPE_MOUSE, ps->pdata->info, &event, result,
-	                  freerdp_input_send_mouse_event, context->input, flags, x, y);
+	           freerdp_input_send_mouse_event, context->input, flags, x, y);
 	return result;
 }
 

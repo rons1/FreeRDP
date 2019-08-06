@@ -35,6 +35,7 @@
 #include "pf_channels.h"
 #include "pf_client.h"
 #include "pf_context.h"
+#include "pf_rail.h"
 #include "pf_rdpgfx.h"
 #include "pf_log.h"
 #include "pf_disp.h"
@@ -46,12 +47,23 @@ void pf_OnChannelConnectedEventHandler(void* data,
 {
 	pClientContext* pc = (pClientContext*) data;
 	pServerContext* ps = pc->pdata->ps;
-
 	WLog_INFO(TAG, "Channel connected: %s", e->name);
 
 	if (strcmp(e->name, RDPEI_DVC_CHANNEL_NAME) == 0)
 	{
 		pc->rdpei = (RdpeiClientContext*) e->pInterface;
+	}
+	else if (strcmp(e->name, RAIL_SVC_CHANNEL_NAME) == 0)
+	{
+		pc->rail = (RailClientContext*) e->pInterface;
+	
+		if (ps->rail->Start(ps->rail) != CHANNEL_RC_OK)
+		{
+			WLog_ERR(TAG, "failed to start RAIL server");
+			return;
+		}
+
+		pf_rail_pipeline_init(pc->rail, ps->rail, pc->pdata);
 	}
 	else if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
 	{
@@ -83,7 +95,6 @@ void pf_OnChannelDisconnectedEventHandler(void* data,
 	rdpContext* context = (rdpContext*) data;
 	pClientContext* pc = (pClientContext*) context;
 	pServerContext* ps = pc->pdata->ps;
-
 	WLog_INFO(TAG, "Channel disconnected: %s", e->name);
 
 	if (strcmp(e->name, RDPEI_DVC_CHANNEL_NAME) == 0)
@@ -122,6 +133,9 @@ BOOL pf_server_channels_init(pServerContext* ps)
 		if (!pf_server_disp_init(ps))
 			return FALSE;
 	}
+
+	if (!pf_rail_context_init(ps))
+		return FALSE;
 
 	return TRUE;
 }

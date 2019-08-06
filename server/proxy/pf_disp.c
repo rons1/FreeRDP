@@ -44,7 +44,7 @@ static UINT pf_disp_on_caps_control(DispClientContext* context, UINT32 MaxNumMon
 }
 
 void pf_disp_register_callbacks(DispClientContext* client, DispServerContext* server,
-                           proxyData* pdata)
+                                proxyData* pdata)
 {
 	client->custom = (void*) pdata;
 	server->custom = (void*) pdata;

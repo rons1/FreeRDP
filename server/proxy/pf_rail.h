@@ -19,16 +19,16 @@
  * limitations under the License.
  */
 
-#ifndef FREERDP_SERVER_PROXY_RDPEDISP_H
-#define FREERDP_SERVER_PROXY_RDPEDISP_H
+#ifndef FREERDP_SERVER_PROXY_PFRAIL_H
+#define FREERDP_SERVER_PROXY_PFRAIL_H
 
-#include <freerdp/client/disp.h>
-#include <freerdp/server/disp.h>
+#include <freerdp/client/rail.h>
+#include <freerdp/server/rail.h>
 
 #include "pf_context.h"
 
-BOOL pf_server_disp_init(pServerContext* ps);
-void pf_disp_register_callbacks(DispClientContext* client, DispServerContext* server,
-                                proxyData* pdata);
+BOOL pf_rail_context_init(pServerContext* ps);
+void pf_rail_pipeline_init(RailClientContext* client, RailServerContext* server,
+                           proxyData* pdata);
 
-#endif /*FREERDP_SERVER_PROXY_RDPEDISP_H*/
+#endif /*FREERDP_SERVER_PROXY_PFRAIL_H*/

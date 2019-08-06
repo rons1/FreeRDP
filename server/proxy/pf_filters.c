@@ -139,7 +139,7 @@ void pf_filters_unregister_all(filters_list* list)
 
 	if (list == NULL)
 		return;
-	
+
 	count = (size_t) ArrayList_Count(list);
 
 	for (index = 0; index < count; index++)
@@ -158,7 +158,6 @@ BOOL pf_filters_register_new(filters_list* list, const char* module_path, const 
 	proxyFilter* filter = NULL;
 	HMODULE handle = NULL;
 	filterInitFn fn;
-
 	assert(list != NULL);
 	handle = LoadLibraryA(module_path);
 
