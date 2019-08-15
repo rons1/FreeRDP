@@ -31,6 +31,7 @@
 #include <freerdp/client/cliprdr.h>
 #include <freerdp/client/rdpgfx.h>
 #include <freerdp/client/disp.h>
+#include <freerdp/client/passthrough.h>
 
 #include "pf_channels.h"
 #include "pf_client.h"
@@ -39,6 +40,7 @@
 #include "pf_cliprdr.h"
 #include "pf_disp.h"
 #include "pf_log.h"
+#include "pf_bkey.h"
 #include "pf_modules.h"
 #include "pf_rdpsnd.h"
 
@@ -75,6 +77,17 @@ void pf_OnChannelConnectedEventHandler(void* data,
 
 		pc->gfx = (RdpgfxClientContext*) e->pInterface;
 		pf_rdpgfx_pipeline_init(pc->gfx, ps->gfx, pc->pdata);
+	}
+	else if (strcmp(e->name, BKEY_CHANNEL_NAME) == 0)
+	{
+		if (ps->bkey->Start(ps->bkey) != CHANNEL_RC_OK)
+		{
+			WLog_ERR(TAG, "failed to open passthrough server");
+			return;
+		}
+
+		pc->bkey = (PassthroughClientContext*) e->pInterface;
+		pf_bkey_pipeline_init(pc->bkey, ps->bkey, pc->pdata);
 	}
 	else if (strcmp(e->name, DISP_DVC_CHANNEL_NAME) == 0)
 	{
@@ -170,6 +183,13 @@ void pf_OnChannelDisconnectedEventHandler(void* data,
 		if (ps->rdpsnd->Stop(ps->rdpsnd) != CHANNEL_RC_OK)
 			WLog_ERR(TAG, "failed to close rdpsnd server");
 	}
+	else if (strcmp(e->name, BKEY_CHANNEL_NAME) == 0)
+	{
+		if (ps->bkey->Stop(ps->bkey) != CHANNEL_RC_OK)
+			WLog_ERR(TAG, "failed to close pass (bkey) server");
+
+		pc->bkey = NULL;
+	}
 }
 
 BOOL pf_server_channels_init(pServerContext* ps)
@@ -204,6 +224,9 @@ BOOL pf_server_channels_init(pServerContext* ps)
 			return FALSE;
 	}
 
+	if (!pf_server_bkey_init(ps))
+		return FALSE;
+
 	return pf_modules_run_hook(HOOK_TYPE_SERVER_CHANNELS_INIT, context);
 }
 
@@ -231,6 +254,12 @@ void pf_server_channels_free(pServerContext* ps)
 	{
 		rdpsnd_server_context_free(ps->rdpsnd);
 		ps->rdpsnd = NULL;
+	}
+
+	if (ps->bkey)
+	{
+		passthrough_server_context_free(ps->bkey);
+		ps->bkey = NULL;
 	}
 
 	pf_modules_run_hook(HOOK_TYPE_SERVER_CHANNELS_FREE, (rdpContext*) ps);
