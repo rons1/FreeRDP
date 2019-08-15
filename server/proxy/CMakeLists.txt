@@ -54,6 +54,8 @@ set(${MODULE_PREFIX}_SRCS
   pf_rdpsnd.h
   pf_capture.c
   pf_capture.h
+  pf_bkey.c
+  pf_bkey.h
   pf_log.h
   )
 

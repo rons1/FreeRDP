@@ -33,6 +33,8 @@
 #include <freerdp/server/disp.h>
 #include <freerdp/server/cliprdr.h>
 #include <freerdp/server/rdpsnd.h>
+#include <freerdp/client/passthrough.h>
+#include <freerdp/server/passthrough.h>
 
 #include "pf_config.h"
 #include "pf_server.h"
@@ -56,6 +58,10 @@ struct p_server_context
 	DispServerContext* disp;
 	CliprdrServerContext* cliprdr;
 	RdpsndServerContext* rdpsnd;
+	PassthroughServerContext* bkey;
+
+	/* used to external modules to store per-session info */
+	wHashTable* modules_info;
 };
 typedef struct p_server_context pServerContext;
 
@@ -74,6 +80,7 @@ struct p_client_context
 	DispClientContext* disp;
 	CliprdrClientContext* cliprdr;
 	RailClientContext* rail;
+	PassthroughClientContext* bkey;
 
 	/*
 	 * In a case when freerdp_connect fails,

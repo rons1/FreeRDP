@@ -37,7 +37,7 @@ PassthroughClientContext* passthrough_get_client_interface(passthroughPlugin* pa
 	if (!passthrough)
 		return NULL;
 
-	pInterface = (PassthroughClientContext*) passthrough->channelEntryPoints.pInterface;
+	pInterface = (PassthroughClientContext*)passthrough->channelEntryPoints.pInterface;
 	return pInterface;
 }
 
@@ -55,7 +55,7 @@ static UINT passthrough_send_data(PassthroughClientContext* context, const BYTE*
 	 * the underline buffer `data` wasn't allocated by the client, therefore isOwner must be set to
 	 * FALSE to avoid a double free issue.
 	 */
-	s = Stream_New((BYTE*) data, len);
+	s = Stream_New((BYTE*)data, len);
 	if (!s)
 	{
 		WLog_ERR(TAG, "malloc failed!");
@@ -64,7 +64,7 @@ static UINT passthrough_send_data(PassthroughClientContext* context, const BYTE*
 
 	s->isOwner = FALSE;
 
-	passthroughPlugin* passthrough = (passthroughPlugin*) context->handle;
+	passthroughPlugin* passthrough = (passthroughPlugin*)context->handle;
 
 	if (!passthrough)
 	{
@@ -72,13 +72,12 @@ static UINT passthrough_send_data(PassthroughClientContext* context, const BYTE*
 	}
 	else
 	{
-		status = passthrough->channelEntryPoints.pVirtualChannelWriteEx(passthrough->InitHandle,
-		         passthrough->OpenHandle,
-		         (PCHAR) Stream_Buffer(s), len, s);
+		status = passthrough->channelEntryPoints.pVirtualChannelWriteEx(
+		    passthrough->InitHandle, passthrough->OpenHandle, (PCHAR)Stream_Buffer(s), len, s);
 	}
 
 	if (status != CHANNEL_RC_OK)
-		WLog_ERR(TAG, "VirtualChannelWrite failed with %s [%08"PRIX32"]",
+		WLog_ERR(TAG, "VirtualChannelWrite failed with %s [%08" PRIX32 "]",
 		         WTSErrorToString(status), status);
 
 	if (!context->async_write)
@@ -97,7 +96,8 @@ static UINT passthrough_send_data(PassthroughClientContext* context, const BYTE*
  * @return 0 on success, otherwise a Win32 error code
  */
 static UINT passthrough_virtual_channel_event_data_received(passthroughPlugin* passthrough,
-        void* pData, UINT32 dataLength, UINT32 totalLength, UINT32 dataFlags)
+                                                            void* pData, UINT32 dataLength,
+                                                            UINT32 totalLength, UINT32 dataFlags)
 {
 	WLog_DBG(TAG, __FUNCTION__);
 	UINT error = CHANNEL_RC_OK;
@@ -106,12 +106,14 @@ static UINT passthrough_virtual_channel_event_data_received(passthroughPlugin* p
 	return error;
 }
 
-static VOID VCAPITYPE passthrough_virtual_channel_open_event_ex(LPVOID lpUserParam, DWORD openHandle,
-        UINT event,
-        LPVOID pData, UINT32 dataLength, UINT32 totalLength, UINT32 dataFlags)
+static VOID VCAPITYPE passthrough_virtual_channel_open_event_ex(LPVOID lpUserParam,
+                                                                DWORD openHandle, UINT event,
+                                                                LPVOID pData, UINT32 dataLength,
+                                                                UINT32 totalLength,
+                                                                UINT32 dataFlags)
 {
 	UINT error = CHANNEL_RC_OK;
-	passthroughPlugin* passthrough = (passthroughPlugin*) lpUserParam;
+	passthroughPlugin* passthrough = (passthroughPlugin*)lpUserParam;
 
 	if (!passthrough || (passthrough->OpenHandle != openHandle))
 	{
@@ -122,9 +124,9 @@ static VOID VCAPITYPE passthrough_virtual_channel_open_event_ex(LPVOID lpUserPar
 	switch (event)
 	{
 		case CHANNEL_EVENT_DATA_RECEIVED:
-			if ((error = passthrough_virtual_channel_event_data_received(passthrough, pData, dataLength,
-			             totalLength, dataFlags)))
-				WLog_ERR(TAG, "failed with error %"PRIu32"", error);
+			if ((error = passthrough_virtual_channel_event_data_received(
+			         passthrough, pData, dataLength, totalLength, dataFlags)))
+				WLog_ERR(TAG, "failed with error %" PRIu32 "", error);
 
 			break;
 
@@ -147,16 +149,16 @@ static VOID VCAPITYPE passthrough_virtual_channel_open_event_ex(LPVOID lpUserPar
  * @return 0 on success, otherwise a Win32 error code
  */
 static UINT passthrough_virtual_channel_event_connected(passthroughPlugin* passthrough,
-        LPVOID pData, UINT32 dataLength)
+                                                        LPVOID pData, UINT32 dataLength)
 {
 	UINT32 status;
-	status = passthrough->channelEntryPoints.pVirtualChannelOpenEx(passthrough->InitHandle,
-	         &passthrough->OpenHandle, passthrough->channelDef.name,
-	         passthrough_virtual_channel_open_event_ex);
+	status = passthrough->channelEntryPoints.pVirtualChannelOpenEx(
+	    passthrough->InitHandle, &passthrough->OpenHandle, passthrough->channelDef.name,
+	    passthrough_virtual_channel_open_event_ex);
 
 	if (status != CHANNEL_RC_OK)
 	{
-		WLog_ERR(TAG, "pVirtualChannelOpen failed with %s [%08"PRIX32"]",
+		WLog_ERR(TAG, "pVirtualChannelOpen failed with %s [%08" PRIX32 "]",
 		         WTSErrorToString(status), status);
 		return status;
 	}
@@ -176,12 +178,13 @@ static UINT passthrough_virtual_channel_event_disconnected(passthroughPlugin* pa
 	if (passthrough->OpenHandle == 0)
 		return CHANNEL_RC_OK;
 
-	rc = passthrough->channelEntryPoints.pVirtualChannelCloseEx(passthrough->InitHandle, passthrough->OpenHandle);
+	rc = passthrough->channelEntryPoints.pVirtualChannelCloseEx(passthrough->InitHandle,
+	                                                            passthrough->OpenHandle);
 
 	if (CHANNEL_RC_OK != rc)
 	{
-		WLog_ERR(TAG, "pVirtualChannelClose failed with %s [%08"PRIX32"]",
-		         WTSErrorToString(rc), rc);
+		WLog_ERR(TAG, "pVirtualChannelClose failed with %s [%08" PRIX32 "]", WTSErrorToString(rc),
+		         rc);
 		return rc;
 	}
 
@@ -198,16 +201,21 @@ static UINT passthrough_virtual_channel_event_disconnected(passthroughPlugin* pa
 static UINT passthrough_virtual_channel_event_terminated(passthroughPlugin* passthrough)
 {
 	passthrough->InitHandle = 0;
+
+	if (passthrough->write_complete)
+		CloseHandle(passthrough->write_complete);
+
 	free(passthrough->context);
 	free(passthrough);
 	return CHANNEL_RC_OK;
 }
 
-static VOID VCAPITYPE passthrough_virtual_channel_init_event_ex(LPVOID lpUserParam, LPVOID pInitHandle,
-        UINT event, LPVOID pData, UINT dataLength)
+static VOID VCAPITYPE passthrough_virtual_channel_init_event_ex(LPVOID lpUserParam,
+                                                                LPVOID pInitHandle, UINT event,
+                                                                LPVOID pData, UINT dataLength)
 {
 	UINT error = CHANNEL_RC_OK;
-	passthroughPlugin* passthrough = (passthroughPlugin*) lpUserParam;
+	passthroughPlugin* passthrough = (passthroughPlugin*)lpUserParam;
 
 	if (!passthrough || (passthrough->InitHandle != pInitHandle))
 	{
@@ -218,8 +226,11 @@ static VOID VCAPITYPE passthrough_virtual_channel_init_event_ex(LPVOID lpUserPar
 	switch (event)
 	{
 		case CHANNEL_EVENT_CONNECTED:
-			if ((error = passthrough_virtual_channel_event_connected(passthrough, pData, dataLength)))
-				WLog_ERR(TAG, "passthrough_virtual_channel_event_connected failed with error %"PRIu32"!",
+			if ((error =
+			         passthrough_virtual_channel_event_connected(passthrough, pData, dataLength)))
+				WLog_ERR(TAG,
+				         "passthrough_virtual_channel_event_connected failed with error %" PRIu32
+				         "!",
 				         error);
 
 			break;
@@ -227,13 +238,17 @@ static VOID VCAPITYPE passthrough_virtual_channel_init_event_ex(LPVOID lpUserPar
 		case CHANNEL_EVENT_DISCONNECTED:
 			if ((error = passthrough_virtual_channel_event_disconnected(passthrough)))
 				WLog_ERR(TAG,
-				         "passthrough_virtual_channel_event_disconnected failed with error %"PRIu32"!", error);
+				         "passthrough_virtual_channel_event_disconnected failed with error %" PRIu32
+				         "!",
+				         error);
 
 			break;
 
 		case CHANNEL_EVENT_TERMINATED:
 			if ((error = passthrough_virtual_channel_event_terminated(passthrough)))
-				WLog_ERR(TAG, "passthrough_virtual_channel_event_terminated failed with error %"PRIu32"!",
+				WLog_ERR(TAG,
+				         "passthrough_virtual_channel_event_terminated failed with error %" PRIu32
+				         "!",
 				         error);
 
 			break;
@@ -254,7 +269,7 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 	passthroughPlugin* passthrough;
 	PassthroughClientContext* context = NULL;
 	CHANNEL_ENTRY_POINTS_FREERDP_EX* pEntryPointsEx;
-	passthrough = (passthroughPlugin*) calloc(1, sizeof(passthroughPlugin));
+	passthrough = (passthroughPlugin*)calloc(1, sizeof(passthroughPlugin));
 
 	if (!passthrough)
 	{
@@ -268,12 +283,11 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 		goto error;
 	}
 
-	passthrough->channelDef.options =
-	    CHANNEL_OPTION_INITIALIZED;
+	passthrough->channelDef.options = CHANNEL_OPTION_INITIALIZED;
 
-	pEntryPointsEx = (CHANNEL_ENTRY_POINTS_FREERDP_EX*) pEntryPoints;
-	args = (ADDIN_ARGV*) pEntryPointsEx->pExtendedData;
-	channel_name = (char*) args->argv[1];
+	pEntryPointsEx = (CHANNEL_ENTRY_POINTS_FREERDP_EX*)pEntryPoints;
+	args = (ADDIN_ARGV*)pEntryPointsEx->pExtendedData;
+	channel_name = (char*)args->argv[1];
 
 	/* check channel length */
 	if (strlen(channel_name) > CHANNEL_NAME_LEN)
@@ -287,7 +301,7 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 	if ((pEntryPointsEx->cbSize >= sizeof(CHANNEL_ENTRY_POINTS_FREERDP_EX)) &&
 	    (pEntryPointsEx->MagicNumber == FREERDP_CHANNEL_MAGIC_NUMBER))
 	{
-		context = (PassthroughClientContext*) calloc(1, sizeof(PassthroughClientContext));
+		context = (PassthroughClientContext*)calloc(1, sizeof(PassthroughClientContext));
 
 		if (!context)
 		{
@@ -295,7 +309,7 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 			goto error;
 		}
 
-		context->handle = (void*) passthrough;
+		context->handle = (void*)passthrough;
 		context->custom = NULL;
 		context->DataReceived = NULL;
 		context->SendData = passthrough_send_data;
@@ -309,14 +323,14 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 	CopyMemory(&(passthrough->channelEntryPoints), pEntryPoints,
 	           sizeof(CHANNEL_ENTRY_POINTS_FREERDP_EX));
 	passthrough->InitHandle = pInitHandle;
-	rc = passthrough->channelEntryPoints.pVirtualChannelInitEx(passthrough, context, pInitHandle,
-	        &passthrough->channelDef, 1, VIRTUAL_CHANNEL_VERSION_WIN2000,
-	        passthrough_virtual_channel_init_event_ex);
+	rc = passthrough->channelEntryPoints.pVirtualChannelInitEx(
+	    passthrough, context, pInitHandle, &passthrough->channelDef, 1,
+	    VIRTUAL_CHANNEL_VERSION_WIN2000, passthrough_virtual_channel_init_event_ex);
 
 	if (CHANNEL_RC_OK != rc)
 	{
-		WLog_ERR(TAG, "pVirtualChannelInit failed with %s [%08"PRIX32"]",
-		         WTSErrorToString(rc), rc);
+		WLog_ERR(TAG, "pVirtualChannelInit failed with %s [%08" PRIX32 "]", WTSErrorToString(rc),
+		         rc);
 		goto error;
 	}
 

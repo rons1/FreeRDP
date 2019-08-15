@@ -31,8 +31,11 @@
 
 #define TAG PROXY_TAG("mfa")
 
-static TokenValidator* g_token_validator;
-static struct mfa_module_config* config;
+static TokenValidator* g_token_validator = NULL;
+static proxyPluginsManager* g_plugins_manager = NULL;
+
+#define PLUGIN_NAME "mfa"
+#define PLUGIN_DESC "multi factor authentication over RDP"
 
 struct mfa_module_config
 {
@@ -43,13 +46,15 @@ struct mfa_module_config
 	INT64 auth_timeout;
 };
 
-static BOOL mfa_pre_connect(moduleOperations* module, rdpContext* context)
+static struct mfa_module_config config = { 0 };
+
+static BOOL mfa_pre_connect(proxyData* pdata)
 {
-	pServerContext* ps = (pServerContext*)context;
+	pServerContext* ps = pdata->ps;
 	MFA_STATUS mfa_st;
 	MfaServerContext* mfa;
 
-	mfa = module->GetSessionData(module, context);
+	mfa = g_plugins_manager->GetPluginData(PLUGIN_NAME, pdata);
 	if (mfa == NULL)
 	{
 		WLog_ERR(TAG, "mfa server uninitialized!");
@@ -91,14 +96,14 @@ static BOOL pf_mfa_verify_token(MfaServerContext* context, const MFA_CLIENT_TOKE
 
 static void mfa_token_expired(MfaServerContext* context)
 {
-	moduleOperations* module = context->custom;
-	module->AbortConnect(module, context->rdpcontext);
+	pServerContext* ps = (pServerContext*)context->rdpcontext;
+	g_plugins_manager->AbortConnect(ps->pdata);
 }
 
-static BOOL mfa_register_channel(moduleOperations* module, rdpContext* context)
+static BOOL mfa_register_channel(proxyData* pdata)
 {
 	MfaServerContext* mfa;
-	pServerContext* ps = (pServerContext*)context;
+	pServerContext* ps = pdata->ps;
 
 	if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, MFA_SVC_CHANNEL_NAME))
 	{
@@ -114,9 +119,9 @@ static BOOL mfa_register_channel(moduleOperations* module, rdpContext* context)
 	}
 
 	/* save pointer to MFA server */
-	module->SetSessionData(module, context, mfa);
+	g_plugins_manager->SetPluginData(PLUGIN_NAME, pdata, mfa);
 
-	mfa->custom = module;
+	mfa->custom = pdata;
 	mfa->rdpcontext = (rdpContext*)ps;
 
 	/* MFA callbacks */
@@ -126,9 +131,9 @@ static BOOL mfa_register_channel(moduleOperations* module, rdpContext* context)
 	return mfa->Start(mfa) == CHANNEL_RC_OK;
 }
 
-static BOOL mfa_free_channel(moduleOperations* module, rdpContext* context)
+static BOOL mfa_free_channel(proxyData* pdata)
 {
-	MfaServerContext* mfa = module->GetSessionData(module, context);
+	MfaServerContext* mfa = g_plugins_manager->GetPluginData(PLUGIN_NAME, pdata);
 
 	if (mfa)
 	{
@@ -161,15 +166,11 @@ static BOOL mfa_config_load()
 		goto out;
 	}
 
-	config = malloc(sizeof(struct mfa_module_config));
-	if (!config)
-		goto out;
-
-	config->mfa_adfs_base_url = _strdup(pf_config_get_str(ini, "MFA", "AdfsBaseUrl"));
-	config->mfa_audience = _strdup(pf_config_get_str(ini, "MFA", "Audience"));
-	config->insecure_ssl = pf_config_get_bool(ini, "MFA", "InsecureSSL");
-	config->token_skew_minutes = IniFile_GetKeyValueInt(ini, "MFA", "TokenSkewMinutes");
-	config->auth_timeout = IniFile_GetKeyValueInt(ini, "MFA", "WaitTimeout");
+	config.mfa_adfs_base_url = _strdup(pf_config_get_str(ini, "MFA", "AdfsBaseUrl"));
+	config.mfa_audience = _strdup(pf_config_get_str(ini, "MFA", "Audience"));
+	config.insecure_ssl = pf_config_get_bool(ini, "MFA", "InsecureSSL");
+	config.token_skew_minutes = IniFile_GetKeyValueInt(ini, "MFA", "TokenSkewMinutes");
+	config.auth_timeout = IniFile_GetKeyValueInt(ini, "MFA", "WaitTimeout");
 	ok = TRUE;
 
 out:
@@ -179,36 +180,60 @@ out:
 
 static void mfa_config_free()
 {
-	free(config->mfa_adfs_base_url);
-	free(config->mfa_audience);
-	free(config);
+	free(config.mfa_adfs_base_url);
+	free(config.mfa_audience);
 }
 
-BOOL module_init(moduleOperations* module)
+static BOOL mfa_plugin_unload()
 {
+	mfa_config_free();
+	token_validator_free(g_token_validator);
+	return TRUE;
+}
+
+static proxyPlugin mfa_plugin = {
+	PLUGIN_NAME,          /* name */
+	PLUGIN_DESC,          /* description */
+	mfa_pre_connect,      /* ClientPreConnect */
+	NULL,                 /* ClientLoginFailure */
+	NULL,                 /* ServerPostConnect */
+	mfa_register_channel, /* ServerChannelsInit */
+	mfa_free_channel,     /* ServerChannelsFree */
+	NULL,                 /* KeyboardEvent */
+	NULL,                 /* MouseEvent */
+	mfa_plugin_unload     /* PluginUnload */
+};
+
+BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)
+{
+#ifndef WITH_MFA
+	return FALSE;
+#endif
+
+	g_plugins_manager = plugins_manager;
+
 	if (!mfa_config_load())
 	{
 		WLog_ERR(TAG, "mfa: module_init: mfa_config_load failed!");
 		return FALSE;
 	}
 
-	g_token_validator = token_validator_init(config->mfa_adfs_base_url, config->mfa_audience,
-	                                         config->token_skew_minutes, config->insecure_ssl);
+	g_token_validator = token_validator_init(config.mfa_adfs_base_url, config.mfa_audience,
+	                                         config.token_skew_minutes, config.insecure_ssl);
 
 	if (!g_token_validator)
 	{
+		mfa_config_free();
 		WLog_ERR(TAG, "token_validator_init failed!");
 		return FALSE;
 	}
 
-	module->ClientPreConnect = mfa_pre_connect;
-	module->ServerChannelsInit = mfa_register_channel;
-	module->ServerChannelsFree = mfa_free_channel;
-	return TRUE;
-}
+	if (!plugins_manager->RegisterPlugin(&mfa_plugin))
+	{
+		token_validator_free(g_token_validator);
+		mfa_config_free();
+		return FALSE;
+	}
 
-BOOL module_exit(moduleOperations* module)
-{
-	mfa_config_free();
 	return TRUE;
 }

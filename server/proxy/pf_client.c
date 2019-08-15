@@ -36,9 +36,23 @@
 #include "pf_log.h"
 #include "pf_modules.h"
 #include "pf_capture.h"
+#include "pf_bkey.h"
 
 #define TAG PROXY_TAG("client")
 
+static BOOL pf_client_load_passthrough_channel(rdpContext* context, char* channel_name)
+{
+	char* params[2];
+	params[0] = "plex";
+	params[1] = channel_name;
+
+	return freerdp_client_add_static_channel(context->settings, 2, (char**)params);
+}
+
+/**
+ * Re-negotiate with original client after negotiation between the proxy
+ * and the target has finished.
+ */
 static BOOL proxy_server_reactivate(rdpContext* ps, const rdpContext* pc)
 {
 	if (!pf_context_copy_settings(ps->settings, pc->settings))
@@ -154,6 +168,9 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 		LOG_ERR(TAG, pc, "Failed to load rdpsnd client");
 		return FALSE;
 	}
+
+	if (!pf_client_load_passthrough_channel(instance->context, BKEY_CHANNEL_NAME))
+		return FALSE;
 
 	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
 	{
