@@ -52,7 +52,10 @@
 #include <freerdp/server/rail.h>
 #include <freerdp/server/rdpgfx.h>
 #include <freerdp/server/disp.h>
+#include <freerdp/server/passthrough.h>
+#ifdef WITH_MFA
 #include <freerdp/server/mfa.h>
+#endif
 
 void freerdp_channels_dummy(void)
 {
@@ -73,6 +76,7 @@ void freerdp_channels_dummy(void)
 	mfa = mfa_server_context_new(NULL);
 	mfa_server_context_free(mfa);
 #endif
+	PassthroughServerContext* pass;
 	audin = audin_server_context_new(NULL);
 	audin_server_context_free(audin);
 	rdpsnd = rdpsnd_server_context_new(NULL);
@@ -97,6 +101,8 @@ void freerdp_channels_dummy(void)
 	rdpgfx_server_context_free(rdpgfx);
 	disp = disp_server_context_new(NULL);
 	disp_server_context_free(disp);
+	pass = passthrough_server_context_new(NULL, NULL);
+	passthrough_server_context_free(pass);
 }
 
 /**
