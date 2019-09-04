@@ -32,6 +32,7 @@
 #define TAG CHANNELS_TAG("mfa.server")
 
 #define MFA_HEADER_LENGTH 8
+#define MFA_AUDIENCE_LEN 36
 
 struct _mfa_server_private
 {
@@ -41,12 +42,14 @@ struct _mfa_server_private
 	void* ChannelHandle;
 	HANDLE ChannelEvent;
 
-	MFA_STATUS status;     /* current status of MFA authentication */
-	HANDLE auth_status;    /* used by proxy's client to wait for MFA auth status */
-	HANDLE exp_thread;     /* handle to a thread that manages token expiration */
+	MFA_STATUS status; /* current status of MFA authentication */
 	HANDLE timer;
 
 	wStream* s;
+	char audience[MFA_AUDIENCE_LEN + 1];
+
+	CRITICAL_SECTION lock;
+	BOOL should_update_exp_timer;
 };
 typedef struct _mfa_server_private MfaServerPrivate;
 
