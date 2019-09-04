@@ -45,71 +45,53 @@ static INT64 FileTime_to_POSIX(LPFILETIME ft)
 	return date.QuadPart / 10000000;
 }
 
-/* Read on msdn about FILETIME and LARGE_INTEGER structs. */
-static HANDLE mfa_create_token_timer(INT64 token_exp)
+static void mfa_update_auth_status(MfaServerContext* context, MFA_STATUS status)
 {
-	HANDLE timer;
+	MfaServerPrivate* mfa;
+
+	if (!context)
+		return;
+
+	mfa = (MfaServerPrivate*)context->handle;
+
+	EnterCriticalSection(&mfa->lock);
+	mfa->status = status;
+	LeaveCriticalSection(&mfa->lock);
+}
+
+static void CALLBACK mfa_token_expired_cb(LPVOID lpArg, DWORD dwTimerLowValue,
+                                          DWORD dwTimerHighValue)
+{
+	MfaServerContext* context = (MfaServerContext*)lpArg;
+	WLog_INFO(TAG, "MFA authentication token expired");
+
+	mfa_update_auth_status(context, MFA_STATUS_TOKEN_EXPIRED);
+	IFCALL(context->TokenExpired, context);
+}
+
+/* Read on msdn about FILETIME and LARGE_INTEGER structs. */
+static BOOL mfa_set_waitable_timer(MfaServerContext* context)
+{
 	INT64 now, diff;
 	LARGE_INTEGER due;
 	FILETIME fileTime;
+	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
 
 	GetSystemTimeAsFileTime(&fileTime);
 	now = FileTime_to_POSIX(&fileTime);
-	diff = token_exp - now;
+	diff = context->token_exp - now;
 
-	WLog_INFO(TAG, "token_validator_create_timer(): now: %ld, exp: %ld, diff: %ld sec", now,
-	          token_exp, diff);
+	WLog_INFO(TAG, "mfa_set_waitable_timer: now: %ld, exp: %ld, diff: %ld sec", now,
+	          context->token_exp, diff);
 
-	if (now >= token_exp)
+	if (now >= context->token_exp)
 	{
-		WLog_ERR(TAG, "token_validator_create_timer(): now >= token_exp");
-		return NULL;
-	}
-
-	timer = CreateWaitableTimer(NULL, TRUE, NULL);
-	if (NULL == timer)
-	{
-		WLog_ERR(TAG, "token_validator_create_timer(): CreateWaitableTimer failed");
-		return NULL;
+		WLog_ERR(TAG, "mfa_set_waitable_timer: now >= token_exp");
+		return FALSE;
 	}
 
 	due.QuadPart = -10000000LL * diff; /* WinApi is the best! */
-	if (!SetWaitableTimer(timer, &due, 0, NULL, NULL, 0))
-	{
-		CloseHandle(timer);
-		return NULL;
-	}
-
-	return timer;
-}
-
-void pf_mfa_wait_for_token_expired_thread(MfaServerContext* context)
-{
-	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-
-	if (mfa->exp_thread == NULL || mfa->timer == NULL)
-	{
-		/* exp_thread is not set, client probably didn't provide a token */
-		WLog_INFO(TAG, "[%s]: MFA not initialized, no need to wait", __FUNCTION__);
-		return;
-	}
-
-	/* wait for expired thread to finish */
-	WLog_INFO(TAG, "waiting for exp_thread to exit");
-	if (WaitForSingleObject(mfa->exp_thread, INFINITE) != WAIT_OBJECT_0)
-	{
-		WLog_ERR(TAG, "pf_server_wait_for_mfa_to_finish(): WaitForSingleObject failed!");
-		return;
-	}
-
-	WLog_INFO(TAG, "exp_thread exited");
-}
-
-static void mfa_update_auth_status(MfaServerContext* context, MFA_STATUS status)
-{
-	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-	mfa->status = status;
-	SetEvent(mfa->auth_status);
+	return SetWaitableTimer(mfa->timer, &due, 0, mfa_token_expired_cb, context, 0);
 }
 
 wStream* mfa_server_packet_new(UINT16 msgType, UINT16 msgFlags, UINT32 dataLen)
@@ -157,44 +139,15 @@ static UINT mfa_server_receive_client_cancelled(MfaServerContext* context, wStre
 {
 	WLog_INFO(TAG, __FUNCTION__);
 	mfa_update_auth_status(context, MFA_STATUS_AUTH_FAIL);
+	IFCALL(context->AuthCancelled, context);
 	return CHANNEL_RC_OK;
-}
-
-DWORD WINAPI token_validator_exp_thread(LPVOID arg)
-{
-	DWORD status;
-	MfaServerContext* context = arg;
-	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-	HANDLE wait_objects[2] = { mfa->timer, mfa->StopEvent };
-
-	status = WaitForMultipleObjects(ARRAYSIZE(wait_objects), wait_objects, FALSE, INFINITE);
-
-	switch (status)
-	{
-		case WAIT_FAILED:
-			// TODO: how to handle this error?
-			// if we just ignore it, the token will never expire
-			// TODO: check when WAIT_FAILED occures
-			break;
-		case WAIT_OBJECT_0:
-			WLog_INFO(TAG, "token expired");
-			context->ServerTokenResponse(context, MFA_FLAG_TOKEN_EXPIRED);
-			IFCALL(context->TokenExpired, context);
-			break;
-		case WAIT_OBJECT_0 + 1:
-			WLog_INFO(TAG, "token_validator_exp_thread: stop event is set!");
-			break;
-		default:
-			break;
-	}
-
-	ExitThread(0);
-	return 0;
 }
 
 static BOOL mfa_server_set_token_info(MfaServerContext* context, INT64 exp, const char* nonce)
 {
 	context->token_exp = exp;
+
+	free(context->token_nonce);
 	context->token_nonce = _strdup(nonce);
 
 	if (!context->token_nonce)
@@ -203,41 +156,41 @@ static BOOL mfa_server_set_token_info(MfaServerContext* context, INT64 exp, cons
 		return FALSE;
 	}
 
-	WLog_INFO(TAG, "token nonce: %s, token expiration date: %d", context->token_nonce, exp);
+	WLog_INFO(TAG, "[%s]: token nonce: %s, token expiration date: %d", __FUNCTION__, nonce, exp);
 	return TRUE;
 }
 
 static BOOL mfa_server_handle_valid_token(MfaServerContext* context)
 {
-	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-	mfa_update_auth_status(context, MFA_STATUS_AUTH_SUCCESS);
+	MfaServerPrivate* mfa;
 
-	if (context->token_exp > 0)
+	if (!context)
+		return FALSE;
+
+	mfa = (MfaServerPrivate*)context->handle;
+
+	if (context->token_exp <= 0)
+		return TRUE;
+
+	/* only update expiration timer for FIRST token */
+	if (!mfa->should_update_exp_timer)
+		return TRUE;
+
+	/* update token expiration timer */
+	if (!mfa_set_waitable_timer(context))
 	{
-		mfa->timer = mfa_create_token_timer(context->token_exp);
-		if (!mfa->timer)
-		{
-			WLog_ERR(TAG, "mfa_create_token_timer failed!");
-			return FALSE;
-		}
-
-		if (!(mfa->exp_thread =
-		          CreateThread(NULL, 0, token_validator_exp_thread, context, 0, NULL)))
-		{
-			WLog_ERR(TAG, "CreateThread failed!");
-			CloseHandle(mfa->timer);
-			mfa->timer = NULL;
-			return FALSE;
-		}
+		WLog_ERR(TAG, "mfa_set_waitable_timer failed!");
+		return FALSE;
 	}
 
+	mfa->should_update_exp_timer = FALSE;
 	return TRUE;
 }
 
 static UINT mfa_server_receive_client_token(MfaServerContext* context, wStream* s,
                                             MFA_HEADER* header)
 {
-	MFA_CLIENT_TOKEN ct;
+	MFA_CLIENT_TOKEN ct = { 0 };
 	UINT error = CHANNEL_RC_OK;
 
 	if (Stream_GetRemainingLength(s) < 4)
@@ -266,21 +219,18 @@ static UINT mfa_server_receive_client_token(MfaServerContext* context, wStream* 
 	if (IFCALLRESULT(FALSE, context->VerifyToken, context, &ct))
 	{
 		if (!mfa_server_handle_valid_token(context))
-		{
-			context->ServerTokenResponse(context, MFA_FLAG_FAIL);
 			goto error;
-		}
 
-		context->ServerTokenResponse(context, MFA_FLAG_OK);
+		mfa_update_auth_status(context, MFA_STATUS_AUTHENTICATED);
 	}
 	else
 	{
 		WLog_ERR(TAG, "token verification failed!", error);
 		mfa_update_auth_status(context, MFA_STATUS_AUTH_FAIL);
-		context->ServerTokenResponse(context, MFA_FLAG_FAIL);
 	}
 
 error:
+	IFCALL(context->AuthenticationResult, context, context->GetStatus(context));
 	free(ct.TokenData);
 	return error;
 }
@@ -293,6 +243,7 @@ error:
 static UINT mfa_server_receive_pdu(MfaServerContext* context, wStream* s, MFA_HEADER* header)
 {
 	UINT error;
+
 	WLog_INFO(TAG,
 	          "MfaServerReceivePdu: msgType: %" PRIu16 " msgFlags: 0x%04" PRIX16
 	          " dataLen: %" PRIu32 "",
@@ -314,45 +265,37 @@ static UINT mfa_server_receive_pdu(MfaServerContext* context, wStream* s, MFA_HE
 
 		default:
 			error = ERROR_INVALID_DATA;
-			WLog_DBG(TAG, "Unexpected clipboard PDU type: %" PRIu16 "", header->msgType);
+			WLog_DBG(TAG, "Unexpected MFA PDU type: %" PRIu16 "", header->msgType);
 			break;
 	}
 
 	return error;
 }
 
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
 static UINT mfa_send_server_ready(MfaServerContext* context, const MFA_SERVER_READY* server_ready)
 {
 	wStream* s;
 	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-	s = mfa_server_packet_new(CB_SERVER_READY, 0, 2);
+	s = mfa_server_packet_new(CB_SERVER_READY, 0, 2 + MFA_AUDIENCE_LEN);
 	if (!s)
 	{
 		WLog_ERR(TAG, "mfa_server_packet_new failed!");
 		return ERROR_INTERNAL_ERROR;
 	}
 
-	Stream_Write_UINT16(s, server_ready->version); /* version (2 bytes) */
+	Stream_Write_UINT16(s, server_ready->version);           /* MFA Version (2 bytes) */
+	Stream_Write(s, (BYTE*)mfa->audience, MFA_AUDIENCE_LEN); /* MFA Application audience */
 
 	WLog_DBG(TAG, "mfa_send_server_ready");
 	return mfa_server_packet_send(mfa, s);
 }
 
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
 static UINT mfa_send_server_token_response(MfaServerContext* context, const enum MFA_FLAGS flags)
 {
 	wStream* s;
 	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
 	s = mfa_server_packet_new(CB_SERVER_TOKEN_RESPONSE, flags, 0);
+
 	if (!s)
 	{
 		WLog_ERR(TAG, "mfa_server_packet_new failed!");
@@ -360,6 +303,34 @@ static UINT mfa_send_server_token_response(MfaServerContext* context, const enum
 	}
 
 	WLog_DBG(TAG, "mfa_send_server_token_response");
+	return mfa_server_packet_send(mfa, s);
+}
+
+static void mfa_reset_state(MfaServerContext* context)
+{
+	MfaServerPrivate* priv = (MfaServerPrivate*)context->handle;
+
+	priv->status = MFA_STATUS_UNINITIALIZED;
+	free(context->token_nonce);
+	context->token_nonce = NULL;
+}
+
+static UINT mfa_send_server_send_refresh_token(MfaServerContext* context)
+{
+	wStream* s;
+	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
+
+	mfa_reset_state(context);
+
+	s = mfa_server_packet_new(CB_SERVER_REFRESH_TOKEN, MFA_FLAG_UNUSED, 0);
+
+	if (!s)
+	{
+		WLog_ERR(TAG, "mfa_server_packet_new failed!");
+		return ERROR_INTERNAL_ERROR;
+	}
+
+	WLog_INFO(TAG, "mfa_send_server_send_refresh_token");
 	return mfa_server_packet_send(mfa, s);
 }
 
@@ -418,6 +389,9 @@ UINT mfa_server_read(MfaServerContext* context)
 		if (status == WAIT_TIMEOUT)
 			return CHANNEL_RC_OK;
 
+		if (!Stream_EnsureRemainingCapacity(s, BytesToRead))
+			return CHANNEL_RC_NO_MEMORY;
+
 		if (!WTSVirtualChannelRead(mfa->ChannelHandle, 0, (PCHAR)Stream_Pointer(s), BytesToRead,
 		                           &BytesReturned))
 		{
@@ -432,11 +406,15 @@ UINT mfa_server_read(MfaServerContext* context)
 	{
 		position = Stream_GetPosition(s);
 		Stream_SetPosition(s, 0);
+
+		if (!Stream_EnsureRemainingCapacity(s, MFA_HEADER_LENGTH))
+			return CHANNEL_RC_NO_MEMORY;
+
 		Stream_Read_UINT16(s, header.msgType);  /* msgType (2 bytes) */
 		Stream_Read_UINT16(s, header.msgFlags); /* msgFlags (2 bytes) */
 		Stream_Read_UINT32(s, header.dataLen);  /* dataLen (4 bytes) */
 
-		if (!Stream_EnsureCapacity(s, (header.dataLen + MFA_HEADER_LENGTH)))
+		if (!Stream_EnsureRemainingCapacity(s, header.dataLen))
 		{
 			WLog_ERR(TAG, "Stream_EnsureCapacity failed!");
 			return CHANNEL_RC_NO_MEMORY;
@@ -459,6 +437,9 @@ UINT mfa_server_read(MfaServerContext* context)
 
 			if (status == WAIT_TIMEOUT)
 				return CHANNEL_RC_OK;
+
+			if (!Stream_EnsureRemainingCapacity(s, BytesToRead))
+				return CHANNEL_RC_NO_MEMORY;
 
 			if (!WTSVirtualChannelRead(mfa->ChannelHandle, 0, (PCHAR)Stream_Pointer(s), BytesToRead,
 			                           &BytesReturned))
@@ -715,8 +696,6 @@ static UINT mfa_server_stop(MfaServerContext* context)
 			return error;
 		}
 
-		pf_mfa_wait_for_token_expired_thread(context);
-
 		CloseHandle(mfa->Thread);
 		CloseHandle(mfa->StopEvent);
 	}
@@ -733,30 +712,16 @@ static HANDLE mfa_server_get_event_handle(MfaServerContext* context)
 	return mfa->ChannelEvent;
 }
 
-static MFA_STATUS mfa_wait_for_auth(MfaServerContext* context, HANDLE cancelWait, DWORD timeout)
+static MFA_STATUS mfa_get_status(MfaServerContext* context)
 {
-	DWORD status;
 	MfaServerPrivate* mfa = (MfaServerPrivate*)context->handle;
-	HANDLE handles[2] = { mfa->auth_status, cancelWait };
-	status = WaitForMultipleObjects(2, handles, FALSE, timeout);
+	MFA_STATUS status;
 
-	switch (status)
-	{
-		case WAIT_FAILED:
-			WLog_ERR(TAG, "mfa_wait_for_auth: WAIT_FAILED");
-			return MFA_STATUS_AUTH_FAIL;
-		case WAIT_OBJECT_0:
-			/* auth status was updated */
-			return mfa->status;
-		case WAIT_OBJECT_0 + 1:
-			/* session ended */
-			return MFA_STATUS_AUTH_FAIL;
-		case WAIT_TIMEOUT:
-			WLog_INFO(TAG, "pf_client_wait_for_mfa: timeout passed.");
-			return MFA_STATUS_AUTH_TIMEOUT;
-	}
+	EnterCriticalSection(&mfa->lock);
+	status = mfa->status;
+	DeleteCriticalSection(&mfa->lock);
 
-	return mfa->status;
+	return status;
 }
 
 /**
@@ -769,7 +734,7 @@ static UINT mfa_server_check_event_handle(MfaServerContext* context)
 	return mfa_server_read(context);
 }
 
-MfaServerContext* mfa_server_context_new(HANDLE vcm)
+MfaServerContext* mfa_server_context_new(HANDLE vcm, const char* mfa_audience)
 {
 	MfaServerContext* context;
 	MfaServerPrivate* mfa;
@@ -784,16 +749,18 @@ MfaServerContext* mfa_server_context_new(HANDLE vcm)
 	context->Stop = mfa_server_stop;
 	context->GetEventHandle = mfa_server_get_event_handle;
 	context->CheckEventHandle = mfa_server_check_event_handle;
-	context->WaitForAuth = mfa_wait_for_auth;
 
 	context->SetTokenInfo = mfa_server_set_token_info;
 	context->ServerReady = mfa_send_server_ready;
 	context->ServerTokenResponse = mfa_send_server_token_response;
+	context->ForceRefreshToken = mfa_send_server_send_refresh_token;
+	context->GetStatus = mfa_get_status;
 
 	/* message callbacks */
 	context->VerifyToken = NULL;
 
 	mfa = context->handle = (MfaServerPrivate*)calloc(1, sizeof(MfaServerPrivate));
+	mfa->should_update_exp_timer = TRUE;
 
 	if (!mfa)
 	{
@@ -801,13 +768,19 @@ MfaServerContext* mfa_server_context_new(HANDLE vcm)
 		goto error;
 	}
 
-	mfa->status = MFA_STATUS_UNINITIALIZED;
-
-	if (!(mfa->auth_status = CreateEvent(NULL, TRUE, FALSE, NULL)))
+	mfa->timer = CreateWaitableTimer(NULL, TRUE, NULL);
+	if (NULL == mfa->timer)
 	{
-		WLog_ERR(TAG, "CreateEvent failed!");
+		WLog_ERR(TAG, "mfa_server_context_new: CreateWaitableTimer failed");
 		goto error;
 	}
+
+	mfa->status = MFA_STATUS_UNINITIALIZED;
+
+	if (!mfa_audience || strlen(mfa_audience) != MFA_AUDIENCE_LEN)
+		goto error;
+
+	strncpy(mfa->audience, mfa_audience, MFA_AUDIENCE_LEN);
 
 	mfa->vcm = vcm;
 	mfa->s = Stream_New(NULL, 4096);
@@ -817,6 +790,9 @@ MfaServerContext* mfa_server_context_new(HANDLE vcm)
 		WLog_ERR(TAG, "Stream_New failed!");
 		goto error;
 	}
+
+	if (!InitializeCriticalSectionEx(&(mfa->lock), 0, 0))
+		goto error;
 
 	return context;
 error:
@@ -837,14 +813,10 @@ void mfa_server_context_free(MfaServerContext* context)
 	{
 		Stream_Free(mfa->s, TRUE);
 
-		if (mfa->auth_status)
-			CloseHandle(mfa->auth_status);
-
-		if (mfa->exp_thread)
-			CloseHandle(mfa->exp_thread);
-
 		if (mfa->timer)
 			CloseHandle(mfa->timer);
+
+		DeleteCriticalSection(&mfa->lock);
 	}
 
 	if (context->token_nonce)
