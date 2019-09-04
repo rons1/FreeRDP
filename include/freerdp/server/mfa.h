@@ -42,17 +42,21 @@ typedef UINT (*psMfaCheckEventHandle)(MfaServerContext* context);
 
 typedef UINT (*psMfaServerReady)(MfaServerContext* context, const MFA_SERVER_READY* sr);
 typedef void (*psMfaTokenExpired)(MfaServerContext* context);
+typedef void (*psMfaAuthCancelled)(MfaServerContext* context);
+typedef BOOL (*psMfaAuthenticationResult)(MfaServerContext* context, MFA_STATUS result);
 typedef BOOL (*psMfaVerifyToken)(MfaServerContext* context, const MFA_CLIENT_TOKEN* ct);
 typedef BOOL (*psMfaSetTokenInfo)(MfaServerContext* context, INT64 exp, const char* nonce);
 typedef UINT (*psMfaServerTokenResponse)(MfaServerContext* context, const enum MFA_FLAGS flags);
-typedef MFA_STATUS (*psMfaWaitForAuth)(MfaServerContext* context, HANDLE cancelWait, DWORD timeout);
+typedef UINT (*psMfaServerRefreshToken)(MfaServerContext* context);
+typedef MFA_STATUS (*psMfaGetStatus)(MfaServerContext* context);
 
 enum mfa_status
 {
 	MFA_STATUS_UNINITIALIZED = 0,
-	MFA_STATUS_AUTH_SUCCESS,
 	MFA_STATUS_AUTH_FAIL,
 	MFA_STATUS_AUTH_TIMEOUT,
+	MFA_STATUS_TOKEN_EXPIRED,
+	MFA_STATUS_AUTHENTICATED,
 };
 
 struct _mfa_server_context
@@ -68,11 +72,15 @@ struct _mfa_server_context
 	psMfaCheckEventHandle CheckEventHandle;
 
 	psMfaSetTokenInfo SetTokenInfo;
+	psMfaServerTokenResponse ServerTokenResponse;
+	psMfaServerRefreshToken ForceRefreshToken;
+	psMfaGetStatus GetStatus;
+
 	psMfaServerReady ServerReady;
 	psMfaVerifyToken VerifyToken;
-	psMfaServerTokenResponse ServerTokenResponse;
 	psMfaTokenExpired TokenExpired;
-	psMfaWaitForAuth WaitForAuth;
+	psMfaAuthenticationResult AuthenticationResult;
+	psMfaAuthCancelled AuthCancelled;
 
 	INT64 token_exp;
 	char* token_nonce;
@@ -85,7 +93,7 @@ extern "C"
 {
 #endif
 
-	FREERDP_API MfaServerContext* mfa_server_context_new(HANDLE vcm);
+	FREERDP_API MfaServerContext* mfa_server_context_new(HANDLE vcm, const char* audience);
 	FREERDP_API void mfa_server_context_free(MfaServerContext* context);
 
 #ifdef __cplusplus
