@@ -25,6 +25,8 @@
 #include <freerdp/freerdp.h>
 #include <freerdp/channels/wtsvc.h>
 #include <freerdp/client/rdpei.h>
+#include <freerdp/client/rail.h>
+#include <freerdp/server/rail.h>
 #include <freerdp/client/rdpgfx.h>
 #include <freerdp/server/rdpgfx.h>
 #include <freerdp/client/disp.h>
@@ -52,6 +54,7 @@ struct p_server_context
 	HANDLE vcm;
 	HANDLE dynvcReady;
 
+	RailServerContext* rail;
 	RdpgfxServerContext* gfx;
 	DispServerContext* disp;
 	CliprdrServerContext* cliprdr;
@@ -73,6 +76,7 @@ struct p_client_context
 	proxyData* pdata;
 
 	RdpeiClientContext* rdpei;
+	RailClientContext* rail;
 	RdpgfxClientContext* gfx;
 	DispClientContext* disp;
 	CliprdrClientContext* cliprdr;

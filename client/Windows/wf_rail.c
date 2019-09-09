@@ -846,7 +846,7 @@ void wf_rail_register_update_callbacks(rdpUpdate* update)
 static UINT wf_rail_server_execute_result(RailClientContext* context,
         const RAIL_EXEC_RESULT_ORDER* execResult)
 {
-	WLog_DBG(TAG, "RailServerExecuteResult: 0x%08X", execResult->rawResult);
+	WLog_DBG(TAG, "RailServerExecResult: 0x%08X", execResult->rawResult);
 	return CHANNEL_RC_OK;
 }
 
@@ -879,13 +879,13 @@ static UINT wf_rail_server_handshake(RailClientContext* context,
 	context->ClientHandshake(context, &clientHandshake);
 	ZeroMemory(&clientStatus, sizeof(RAIL_CLIENT_STATUS_ORDER));
 	clientStatus.flags = RAIL_CLIENTSTATUS_ALLOWLOCALMOVESIZE;
-	context->ClientInformation(context, &clientStatus);
+	context->ClientClientStatus(context, &clientStatus);
 
 	if (settings->RemoteAppLanguageBarSupported)
 	{
 		RAIL_LANGBAR_INFO_ORDER langBarInfo;
 		langBarInfo.languageBarStatus = 0x00000008; /* TF_SFT_HIDDEN */
-		context->ClientLanguageBarInfo(context, &langBarInfo);
+		context->ClientLangbarInfo(context, &langBarInfo);
 	}
 
 	ZeroMemory(&sysparam, sizeof(RAIL_SYSPARAM_ORDER));
@@ -908,12 +908,21 @@ static UINT wf_rail_server_handshake(RailClientContext* context,
 	sysparam.workArea.right = settings->DesktopWidth;
 	sysparam.workArea.bottom = settings->DesktopHeight;
 	sysparam.dragFullWindows = FALSE;
-	context->ClientSystemParam(context, &sysparam);
+	context->ClientSysparam(context, &sysparam);
 	ZeroMemory(&exec, sizeof(RAIL_EXEC_ORDER));
-	exec.RemoteApplicationProgram = settings->RemoteApplicationProgram;
-	exec.RemoteApplicationWorkingDir = settings->ShellWorkingDirectory;
-	exec.RemoteApplicationArguments = settings->RemoteApplicationCmdLine;
-	context->ClientExecute(context, &exec);
+
+	if (!utf8_string_to_rail_string(settings->RemoteApplicationProgram,
+	                                &exec.exeOrFile) ||
+	    !utf8_string_to_rail_string(settings->ShellWorkingDirectory,
+	                                &exec.workingDir) ||
+	    !utf8_string_to_rail_string(settings->RemoteApplicationCmdLine,
+	                                &exec.arguments))
+		return ERROR_INTERNAL_ERROR;
+
+	context->ClientExec(context, &exec);
+	free(exec.exeOrFile.string);
+	free(exec.workingDir.string);
+	free(exec.arguments.string);
 	return CHANNEL_RC_OK;
 }
 
@@ -955,8 +964,13 @@ static UINT wf_rail_server_min_max_info(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
+<<<<<<< HEAD
 static UINT wf_rail_server_language_bar_info(RailClientContext* context,
         const RAIL_LANGBAR_INFO_ORDER* langBarInfo)
+=======
+static UINT wf_rail_server_langbar_info(RailClientContext* context,
+                                        RAIL_LANGBAR_INFO_ORDER* langBarInfo)
+>>>>>>> feat/rail-server
 {
 	return CHANNEL_RC_OK;
 }
@@ -966,8 +980,13 @@ static UINT wf_rail_server_language_bar_info(RailClientContext* context,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
+<<<<<<< HEAD
 static UINT wf_rail_server_get_appid_response(RailClientContext* context,
         const RAIL_GET_APPID_RESP_ORDER* getAppIdResp)
+=======
+static UINT wf_rail_server_get_appid_resp(RailClientContext* context,
+        RAIL_GET_APPID_RESP_ORDER* getAppIdResp)
+>>>>>>> feat/rail-server
 {
 	return CHANNEL_RC_OK;
 }
@@ -1019,14 +1038,14 @@ BOOL wf_rail_init(wfContext* wfc, RailClientContext* rail)
 	rdpContext* context = (rdpContext*) wfc;
 	wfc->rail = rail;
 	rail->custom = (void*) wfc;
-	rail->ServerExecuteResult = wf_rail_server_execute_result;
-	rail->ServerSystemParam = wf_rail_server_system_param;
+	rail->ServerExecResult = wf_rail_server_exec_result;
+	rail->ServerSysparam = wf_rail_server_system_param;
 	rail->ServerHandshake = wf_rail_server_handshake;
 	rail->ServerHandshakeEx = wf_rail_server_handshake_ex;
 	rail->ServerLocalMoveSize = wf_rail_server_local_move_size;
 	rail->ServerMinMaxInfo = wf_rail_server_min_max_info;
-	rail->ServerLanguageBarInfo = wf_rail_server_language_bar_info;
-	rail->ServerGetAppIdResponse = wf_rail_server_get_appid_response;
+	rail->ServerLangbarInfo = wf_rail_server_langbar_info;
+	rail->ServerGetAppidResp = wf_rail_server_get_appid_resp;
 	wf_rail_register_update_callbacks(context->update);
 	wfc->railWindows = HashTable_New(TRUE);
 	return (wfc->railWindows != NULL);

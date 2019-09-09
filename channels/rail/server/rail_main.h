@@ -1,8 +1,8 @@
 /**
  * FreeRDP: A Remote Desktop Protocol Implementation
- * FreeRDP Proxy Server
+ * RAIL Virtual Channel Plugin
  *
- * Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
+ * Copyright 2019 Mati Shabtay <matishabtay@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,28 @@
  * limitations under the License.
  */
 
-#ifndef FREERDP_SERVER_PROXY_RDPEDISP_H
-#define FREERDP_SERVER_PROXY_RDPEDISP_H
+#ifndef FREERDP_CHANNEL_RAIL_SERVER_MAIN_H
+#define FREERDP_CHANNEL_RAIL_SERVER_MAIN_H
 
-#include <freerdp/client/disp.h>
-#include <freerdp/server/disp.h>
+#include <freerdp/rail.h>
+#include <freerdp/server/rail.h>
 
-#include "pf_context.h"
+#include <winpr/crt.h>
+#include <winpr/wlog.h>
+#include <winpr/stream.h>
 
-BOOL pf_server_disp_init(pServerContext* ps);
-void pf_disp_register_callbacks(DispClientContext* client, DispServerContext* server,
-                                proxyData* pdata);
+#include "../rail_common.h"
 
-#endif /*FREERDP_SERVER_PROXY_RDPEDISP_H*/
+struct _rail_server_private
+{
+	HANDLE thread;
+	HANDLE stopEvent;
+	HANDLE channelEvent;
+	void* rail_channel;
+
+	wStream* input_stream;
+
+	DWORD channelFlags;
+};
+
+#endif /* FREERDP_CHANNEL_RAIL_SERVER_MAIN_H */
