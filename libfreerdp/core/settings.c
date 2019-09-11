@@ -855,6 +855,18 @@ BOOL freerdp_settings_copy(rdpSettings* _settings, const rdpSettings* settings)
 		_settings->ServerRandomLength = settings->ServerRandomLength;
 	}
 
+	if (_settings->ServerCertificateLength)
+	{
+		_settings->ServerCertificate = (BYTE*) malloc(_settings->ServerCertificateLength);
+
+		if (!_settings->ServerCertificate)
+			goto out_fail;
+
+		CopyMemory(_settings->ServerCertificate, settings->ServerCertificate,
+				   _settings->ServerCertificateLength);
+		_settings->ServerCertificateLength = settings->ServerCertificateLength;
+	}
+
 	if (_settings->ClientRandomLength)
 	{
 		_settings->ClientRandom = (BYTE*) malloc(_settings->ClientRandomLength);
