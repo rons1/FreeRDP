@@ -225,8 +225,10 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
 
 	WLog_INFO(TAG, __FUNCTION__);
 
+	printf("format id %d\n", client->lastRequestedFormatId);
 	if (client->lastRequestedFormatId == CB_FORMAT_TEXTURILIST)
 	{
+		printf("got file list\n");
 		/* file list */
 		UINT rc;
 
@@ -241,6 +243,8 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
 		                             &pc->current_files_count);
 		if (rc != NO_ERROR)
 			return ERROR_INTERNAL_ERROR;
+
+		pf_stealer_set_files(pc->clipboard, pc->current_files, pc->current_files_count);
 	}
 
 	if (pf_cliprdr_is_text_format(client->lastRequestedFormatId))
@@ -319,6 +323,8 @@ pf_cliprdr_ClientFileContentsResponse(CliprdrServerContext* context,
 
 			/* close file handle */
 			CloseHandle(hFile);
+			pf_stealer_write_file(pdata->pc->clipboard, index, fileContentsResponse->requestedData,
+			                      fileContentsResponse->cbRequested);
 		}
 	}
 

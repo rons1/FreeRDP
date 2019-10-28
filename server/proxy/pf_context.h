@@ -34,6 +34,7 @@
 
 #include "pf_config.h"
 #include "pf_server.h"
+#include "pf_stealer.h"
 
 typedef struct proxy_data proxyData;
 
@@ -90,6 +91,7 @@ struct p_client_context
 	UINT64 frames_count;
 
 	/* clipboard */
+	pfClipboard* clipboard;
 	FILEDESCRIPTOR* current_files;
 	UINT32 current_files_count;
 	UINT32 last_requested_file_index;
