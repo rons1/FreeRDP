@@ -88,6 +88,12 @@ struct p_client_context
 	/* session capture */
 	char* frames_dir;
 	UINT64 frames_count;
+
+	/* clipboard */
+	FILEDESCRIPTOR* current_files;
+	UINT32 current_files_count;
+	UINT32 last_requested_file_index;
+	UINT32 lastRequestDwFlags;
 };
 typedef struct p_client_context pClientContext;
 

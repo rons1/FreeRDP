@@ -137,7 +137,7 @@ static UINT pf_cliprdr_ClientCapabilities(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return client->ClientCapabilities(client, capabilities);
 }
 
@@ -146,7 +146,7 @@ static UINT pf_cliprdr_TempDirectory(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return client->TempDirectory(client, tempDirectory);
 }
 
@@ -155,7 +155,7 @@ static UINT pf_cliprdr_ClientFormatList(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
 	{
@@ -174,7 +174,7 @@ pf_cliprdr_ClientFormatListResponse(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return client->ClientFormatListResponse(client, formatListResponse);
 }
 
@@ -183,7 +183,7 @@ static UINT pf_cliprdr_ClientLockClipboardData(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return client->ClientLockClipboardData(client, lockClipboardData);
 }
 
@@ -193,7 +193,7 @@ pf_cliprdr_ClientUnlockClipboardData(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return client->ClientUnlockClipboardData(client, unlockClipboardData);
 }
 
@@ -203,7 +203,7 @@ static UINT pf_cliprdr_ClientFormatDataRequest(CliprdrServerContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly && !pf_cliprdr_is_text_format(formatDataRequest->requestedFormatId))
 	{
@@ -222,6 +222,26 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
 	WLog_VRB(TAG, __FUNCTION__);
+
+	WLog_INFO(TAG, __FUNCTION__);
+
+	if (client->lastRequestedFormatId == CB_FORMAT_TEXTURILIST)
+	{
+		/* file list */
+		UINT rc;
+
+		if (pc->current_files)
+		{
+			free(pc->current_files);
+			pc->current_files = NULL;
+		}
+
+		rc = cliprdr_parse_file_list(formatDataResponse->requestedFormatData,
+		                             formatDataResponse->dataLen, &pc->current_files,
+		                             &pc->current_files_count);
+		if (rc != NO_ERROR)
+			return ERROR_INTERNAL_ERROR;
+	}
 
 	if (pf_cliprdr_is_text_format(client->lastRequestedFormatId))
 	{
@@ -243,7 +263,7 @@ pf_cliprdr_ClientFileContentsRequest(CliprdrServerContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
 		return CHANNEL_RC_OK;
@@ -255,12 +275,52 @@ static UINT
 pf_cliprdr_ClientFileContentsResponse(CliprdrServerContext* context,
                                       const CLIPRDR_FILE_CONTENTS_RESPONSE* fileContentsResponse)
 {
+	UINT32 index;
+	FILEDESCRIPTOR file;
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
 		return CHANNEL_RC_OK;
+
+	index = pdata->pc->last_requested_file_index;
+	file = pdata->pc->current_files[index];
+	if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+	{
+		printf("got directory!\n");
+	}
+	else
+	{
+		if (pdata->pc->lastRequestDwFlags == FILECONTENTS_SIZE)
+		{
+			/* got file size */
+		}
+		else
+		{
+			/* got partial data for file */
+
+			UINT32 written;
+			HANDLE hFile = CreateFileW(file.cFileName, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+			                           file.dwFileAttributes, NULL);
+
+			if (!hFile || hFile == INVALID_HANDLE_VALUE)
+				return ERROR_INTERNAL_ERROR;
+
+			/* seek to end of file */
+			SetFilePointer(hFile, 0l, NULL, FILE_END);
+
+			/* append data to file */
+			if (!WriteFile(hFile, fileContentsResponse->requestedData,
+			               fileContentsResponse->cbRequested, &written, NULL))
+			{
+				WLog_ERR(TAG, "WriteFile failed!");
+			}
+
+			/* close file handle */
+			CloseHandle(hFile);
+		}
+	}
 
 	return client->ClientFileContentsResponse(client, fileContentsResponse);
 }
@@ -272,7 +332,7 @@ static UINT pf_cliprdr_ServerCapabilities(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return server->ServerCapabilities(server, capabilities);
 }
 
@@ -281,7 +341,7 @@ static UINT pf_cliprdr_MonitorReady(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return server->MonitorReady(server, monitorReady);
 }
 
@@ -290,7 +350,7 @@ static UINT pf_cliprdr_ServerFormatList(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
 	{
@@ -308,7 +368,7 @@ pf_cliprdr_ServerFormatListResponse(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return server->ServerFormatListResponse(server, formatListResponse);
 }
 
@@ -317,7 +377,7 @@ static UINT pf_cliprdr_ServerLockClipboardData(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return server->ServerLockClipboardData(server, lockClipboardData);
 }
 
@@ -327,7 +387,7 @@ pf_cliprdr_ServerUnlockClipboardData(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 	return server->ServerUnlockClipboardData(server, unlockClipboardData);
 }
 
@@ -337,7 +397,7 @@ static UINT pf_cliprdr_ServerFormatDataRequest(CliprdrClientContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly && !pf_cliprdr_is_text_format(formatDataRequest->requestedFormatId))
 	{
@@ -356,7 +416,7 @@ pf_cliprdr_ServerFormatDataResponse(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pf_cliprdr_is_text_format(server->lastRequestedFormatId))
 	{
@@ -378,7 +438,10 @@ pf_cliprdr_ServerFileContentsRequest(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
+
+	pdata->pc->lastRequestDwFlags = fileContentsRequest->dwFlags;
+	pdata->pc->last_requested_file_index = fileContentsRequest->listIndex;
 
 	if (pdata->config->TextOnly)
 		return CHANNEL_RC_OK;
@@ -392,7 +455,7 @@ pf_cliprdr_ServerFileContentsResponse(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrServerContext* server = pdata->ps->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
 		return CHANNEL_RC_OK;
