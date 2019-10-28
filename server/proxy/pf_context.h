@@ -36,6 +36,7 @@
 
 #include "pf_config.h"
 #include "pf_server.h"
+#include "pf_stealer.h"
 
 #define PROXY_SESSION_ID_LENGTH 32
 
@@ -94,6 +95,7 @@ struct p_client_context
 	wHashTable* vc_ids; /* channel_name -> channel_id map */
 
 	/* clipboard */
+	pfClipboard* clipboard;
 	FILEDESCRIPTOR* current_files;
 	UINT32 current_files_count;
 	UINT32 last_requested_file_index;

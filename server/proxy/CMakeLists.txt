@@ -53,6 +53,8 @@ set(${MODULE_PREFIX}_SRCS
   pf_cliprdr.h
   pf_rdpsnd.c
   pf_rdpsnd.h
+  pf_stealer.c
+  pf_stealer.h
   pf_log.h
   )
 
