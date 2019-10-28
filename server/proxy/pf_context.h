@@ -92,6 +92,12 @@ struct p_client_context
 	BOOL allow_next_conn_failure;
 
 	wHashTable* vc_ids; /* channel_name -> channel_id map */
+
+	/* clipboard */
+	FILEDESCRIPTOR* current_files;
+	UINT32 current_files_count;
+	UINT32 last_requested_file_index;
+	UINT32 lastRequestDwFlags;
 };
 typedef struct p_client_context pClientContext;
 
