@@ -146,7 +146,7 @@ BOOL pf_capture_save_frame(pClientContext* pc, const BYTE* frame)
 	if (!pc->frames_dir)
 		return FALSE;
 
-	rc = _snprintf(NULL, 0, fmt, pc->frames_dir, pc->frames_count++);
+	rc = _snprintf(NULL, 0, fmt, pc->frames_dir, pc->frames_count);
 	if (rc < 0)
 		return FALSE;
 
@@ -155,10 +155,11 @@ BOOL pf_capture_save_frame(pClientContext* pc, const BYTE* frame)
 	if (!file_path)
 		return FALSE;
 
-	rc = sprintf(file_path, fmt, pc->frames_dir, pc->frames_count++);
+	rc = sprintf(file_path, fmt, pc->frames_dir, pc->frames_count);
 	if (rc < 0 || (size_t) rc != size)
 		goto out;
 
+	pc->frames_count++;
 	rc = winpr_bitmap_write(file_path, frame, settings->DesktopWidth, settings->DesktopHeight,
 	                          settings->ColorDepth);
 
