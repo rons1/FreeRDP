@@ -24,8 +24,8 @@
 #include <winpr/sysinfo.h>
 
 #include "pf_update.h"
-#include "pf_capture.h"
 #include "pf_context.h"
+#include "pf_modules.h"
 #include "pf_log.h"
 
 #define TAG PROXY_TAG("update")
@@ -72,27 +72,11 @@ static BOOL pf_client_end_paint(rdpContext* context)
 	pClientContext* pc = (pClientContext*) context;
 	proxyData* pdata = pc->pdata;
 	rdpContext* ps = (rdpContext*)pdata->ps;
-	rdpGdi* gdi = context->gdi;
 
-	/* proxy end paint */
 	if (!ps->update->EndPaint(ps))
 		return FALSE;
 
-	if (!pdata->config->SessionCapture)
-		return TRUE;
-
-	if (gdi->suppressOutput)
-		return TRUE;
-
-	if (gdi->primary->hdc->hwnd->ninvalid < 1)
-		return TRUE;
-
-	if (!pf_capture_save_frame(pc, gdi->primary_buffer))
-		WLog_ERR(TAG, "failed to save captured frame!");
-
-	gdi->primary->hdc->hwnd->invalid->null = TRUE;
-	gdi->primary->hdc->hwnd->ninvalid = 0;
-	return TRUE;
+	return pf_modules_run_hook(HOOK_TYPE_CLIENT_END_PAINT, ps);
 }
 
 static BOOL pf_client_bitmap_update(rdpContext* context, const BITMAP_UPDATE* bitmap)

@@ -50,7 +50,6 @@
 #include "pf_update.h"
 #include "pf_log.h"
 #include "pf_modules.h"
-#include "pf_capture.h"
 
 #define TAG PROXY_TAG("client")
 
@@ -208,16 +207,8 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	ps = (rdpContext*) pc->pdata->ps;
 	config = pc->pdata->config;
 
-	if (config->SessionCapture)
-	{
-		if (!pf_capture_create_session_directory(pc))
-		{
-			WLog_ERR(TAG, "pf_capture_create_session_directory failed!");
-			return FALSE;
-		}
-
-		WLog_INFO(TAG, "frames dir created: %s", pc->frames_dir);
-	}
+	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_POST_CONNECT, ps))
+		return FALSE;
 
 	if (!gdi_init(instance, PIXEL_FORMAT_BGRA32))
 		return FALSE;

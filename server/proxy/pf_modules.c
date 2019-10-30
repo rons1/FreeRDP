@@ -42,17 +42,24 @@ typedef BOOL (*moduleExitFn)(moduleOperations* ops);
 static const char* FILTER_TYPE_STRINGS[] = {
 	"KEYBOARD_EVENT",
 	"MOUSE_EVENT",
+	"CLIENT_END_PAINT",
+	"FILTER_NONE"
 };
 
 static const char* HOOK_TYPE_STRINGS[] = {
 	"CLIENT_PRE_CONNECT",
+	"CLIENT_POST_CONNECT",
+	"CLIENT_END_PAINT",
+	"SERVER_POST_CONNECT",
 	"SERVER_CHANNELS_INIT",
 	"SERVER_CHANNELS_FREE",
+	"SESSION_END",
+	"HOOK_NONE"
 };
 
 static const char* pf_modules_get_filter_type_string(PF_FILTER_TYPE result)
 {
-	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_MOUSE)
+	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_NONE)
 		return FILTER_TYPE_STRINGS[result];
 	else
 		return "FILTER_UNKNOWN";
@@ -60,7 +67,7 @@ static const char* pf_modules_get_filter_type_string(PF_FILTER_TYPE result)
 
 static const char* pf_modules_get_hook_type_string(PF_HOOK_TYPE result)
 {
-	if (result >= HOOK_TYPE_CLIENT_PRE_CONNECT && result <= HOOK_TYPE_SERVER_CHANNELS_FREE)
+	if (result >= HOOK_TYPE_CLIENT_PRE_CONNECT && result <= HOOK_NONE)
 		return HOOK_TYPE_STRINGS[result];
 	else
 		return "HOOK_UNKNOWN";
@@ -87,7 +94,6 @@ BOOL pf_modules_init(void)
  */
 BOOL pf_modules_run_hook(PF_HOOK_TYPE type, rdpContext* context)
 {
-
 	proxyModule* module;
 	moduleOperations* ops;
 	BOOL ok = TRUE;
@@ -107,12 +113,31 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, rdpContext* context)
 			IFCALLRET(ops->ClientPreConnect, ok, ops, context);
 			break;
 
+		case HOOK_TYPE_CLIENT_POST_CONNECT:
+			IFCALLRET(ops->ClientPostConnect, ok, ops, context);
+			break;
+
+		case HOOK_TYPE_SERVER_POST_CONNECT:
+			IFCALLRET(ops->ServerPostConnect, ok, ops, context);
+			break;
+
 		case HOOK_TYPE_SERVER_CHANNELS_INIT:
 			IFCALLRET(ops->ServerChannelsInit, ok, ops, context);
 			break;
 
 		case HOOK_TYPE_SERVER_CHANNELS_FREE:
 			IFCALLRET(ops->ServerChannelsFree, ok, ops, context);
+			break;
+		
+		case HOOK_TYPE_CLIENT_END_PAINT:
+			IFCALLRET(ops->ClientEndPaint, ok, ops, context);
+			break;
+
+		case HOOK_TYPE_SESSION_END:
+			IFCALLRET(ops->SessionEnd, ok, ops, context);
+			break;
+
+		case HOOK_NONE:
 			break;
 		}
 
@@ -155,6 +180,9 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, rdpContext* server, void* param)
 
 		case FILTER_TYPE_MOUSE:
 			IFCALLRET(ops->MouseEvent, result, ops, server, param);
+			break;
+
+		case FILTER_NONE:
 			break;
 		}
 

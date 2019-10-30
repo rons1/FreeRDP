@@ -51,6 +51,7 @@
 #include "pf_rdpgfx.h"
 #include "pf_disp.h"
 #include "pf_channels.h"
+#include "pf_modules.h"
 
 #define TAG PROXY_TAG("server")
 
@@ -144,11 +145,8 @@ static BOOL pf_server_post_connect(freerdp_peer* client)
 	ps = (pServerContext*)client->context;
 	pdata = ps->pdata;
 
-	if (pdata->config->SessionCapture && !client->settings->SupportGraphicsPipeline)
-	{
-		WLog_ERR(TAG, "Session capture feature is enabled, only accepting connections with GFX");
+	if (!pf_modules_run_hook(HOOK_TYPE_SERVER_POST_CONNECT, client->context))
 		return FALSE;
-	}
 
 	pc = pf_context_create_client_context(client->settings);
 	if (pc == NULL)
@@ -341,6 +339,7 @@ static DWORD WINAPI pf_server_handle_client(LPVOID arg)
 
 fail:
 
+	pf_modules_run_hook(HOOK_TYPE_SESSION_END, client->context);
 	pc = (rdpContext*) pdata->pc;
 	WLog_INFO(TAG, "pf_server_handle_client(): starting shutdown of connection (client %s)", client->hostname);
 	WLog_INFO(TAG, "pf_server_handle_client(): stopping proxy's client");

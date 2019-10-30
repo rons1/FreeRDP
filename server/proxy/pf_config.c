@@ -212,32 +212,51 @@ static BOOL pf_config_load_modules(wIniFile* ini, proxyConfig* config)
 
 static BOOL pf_config_load_captures(wIniFile* ini, proxyConfig* config)
 {
-	const char* captures_dir;
+	const char* temp;
 
-	config->SessionCapture = pf_config_get_bool(ini, "SessionCapture", "Enabled");
-	if (!config->SessionCapture)
+	config->DecodeGFX = pf_config_get_bool(ini, "SessionCapture", "DecodeGFX");
+
+	if (!config->DecodeGFX)
 		return TRUE;
 
-	captures_dir = pf_config_get_str(ini, "SessionCapture", "CapturesDirectory");
+	temp = pf_config_get_str(ini, "SessionCapture", "TempFramesDirectory");
 
-	if (!captures_dir)
+	if (!temp)
 		return FALSE;
 
-	config->CapturesDirectory = strdup(captures_dir);
-	if (!config->CapturesDirectory)
+	config->TempFramesDirectory = strdup(temp);
+	if (!config->TempFramesDirectory)
 		return FALSE;
 
-	if (!PathFileExistsA(config->CapturesDirectory))
+	if (!PathFileExistsA(config->TempFramesDirectory))
 	{
-		if (!CreateDirectoryA(config->CapturesDirectory, NULL))
-		{
-			free(config->CapturesDirectory);
-			config->CapturesDirectory = NULL;
-			return FALSE;
-		}
+		if (!CreateDirectoryA(config->TempFramesDirectory, NULL))
+			goto error;
+	}
+
+	temp = pf_config_get_str(ini, "SessionCapture", "FullSessionsDirectory");
+
+	if (!temp)
+		goto error;
+
+	config->FullSessionsDirectory = strdup(temp);
+	if (!config->FullSessionsDirectory)
+		goto error;
+
+	if (!PathFileExistsA(config->FullSessionsDirectory))
+	{
+		if (!CreateDirectoryA(config->FullSessionsDirectory, NULL))
+			goto error;
 	}
 
 	return TRUE;
+
+error:
+	free(config->FullSessionsDirectory);
+	config->FullSessionsDirectory = NULL;
+	free(config->TempFramesDirectory);
+	config->TempFramesDirectory = NULL;
+	return FALSE;
 }
 
 BOOL pf_server_config_load(const char* path, proxyConfig* config)
@@ -294,7 +313,6 @@ void pf_server_config_print(proxyConfig* config)
 	CONFIG_PRINT_SECTION("Server");
 	CONFIG_PRINT_STR(config, Host);
 	CONFIG_PRINT_UINT16(config, Port);
-	CONFIG_PRINT_BOOL(config, SessionCapture);
 
 	if (!config->UseLoadBalanceInfo)
 	{
@@ -328,13 +346,15 @@ void pf_server_config_print(proxyConfig* config)
 		CONFIG_PRINT_UINT32(config, MaxTextLength);
 
 	CONFIG_PRINT_SECTION("SessionCapture");
-	CONFIG_PRINT_BOOL(config, SessionCapture);
-	CONFIG_PRINT_STR(config, CapturesDirectory);
+	CONFIG_PRINT_BOOL(config, DecodeGFX);
+	CONFIG_PRINT_STR(config, TempFramesDirectory);
+	CONFIG_PRINT_STR(config, FullSessionsDirectory);
 }
 
 void pf_server_config_free(proxyConfig* config)
 {
-	free(config->CapturesDirectory);
+	free(config->FullSessionsDirectory);
+	free(config->TempFramesDirectory);
 	free(config->TargetHost);
 	free(config->Host);
 	free(config);

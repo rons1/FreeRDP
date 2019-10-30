@@ -62,8 +62,9 @@ struct proxy_config
 	UINT32 MaxTextLength;
 
 	/* session capture */
-	BOOL SessionCapture;
-	char* CapturesDirectory;
+	BOOL DecodeGFX;
+	char* TempFramesDirectory;
+	char* FullSessionsDirectory;
 };
 
 typedef struct proxy_config proxyConfig;

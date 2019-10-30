@@ -65,8 +65,12 @@ struct module_operations
 
 	/* proxy hooks. a module can set these function pointers to register hooks. */
 	proxyHookFn ClientPreConnect;
+	proxyHookFn ClientPostConnect;
+	proxyHookFn ServerPostConnect;
 	proxyHookFn ServerChannelsInit;
 	proxyHookFn ServerChannelsFree;
+	proxyHookFn ClientEndPaint;
+	proxyHookFn SessionEnd;
 
 	/* proxy filters a module can set these function pointers to register filters. */
 	proxyFilterFn KeyboardEvent;
