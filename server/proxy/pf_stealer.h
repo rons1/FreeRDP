@@ -28,22 +28,25 @@
 typedef struct stolen_file stolenFile;
 typedef struct pf_clipboard pfClipboard;
 
-struct stolen_file {
-    HANDLE handle;
-    DWORD written;
+struct stolen_file
+{
+	HANDLE handle;
+	UINT64 written;
 };
 
-struct pf_clipboard {
-    FILEDESCRIPTOR* descriptors;
-    UINT32 descriptors_count;
+struct pf_clipboard
+{
+	FILEDESCRIPTOR* descriptors;
+	UINT32 descriptors_count;
 
-    stolenFile* stolen_files;
+	stolenFile* stolen_files;
 
-    UINT32 last_requested_file_index;
+	UINT32 last_requested_file_index;
 	UINT32 lastRequestDwFlags;
 };
 
 BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE* data, UINT32 len);
-void pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count);
+BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count);
 pfClipboard* pf_stealer_new(void);
+void pf_stealer_free(pfClipboard* clipboard);
 #endif

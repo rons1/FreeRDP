@@ -159,6 +159,7 @@ void pf_OnChannelDisconnectedEventHandler(void* data, ChannelDisconnectedEventAr
 		if (ps->cliprdr->Stop(ps->cliprdr) != CHANNEL_RC_OK)
 			WLog_ERR(TAG, "failed to stop cliprdr server");
 
+		pf_stealer_free(pc->clipboard);
 		pc->cliprdr = NULL;
 	}
 	else if (strcmp(e->name, "rdpsnd") == 0)
