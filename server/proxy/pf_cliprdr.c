@@ -97,6 +97,7 @@ static BOOL pf_cliprdr_is_copy_paste_valid(proxyConfig* config,
 
 	switch (format)
 	{
+
 		case CF_UNICODETEXT:
 			copy_len = (pdu->dataLen / 2) - 1;
 			break;
@@ -221,15 +222,13 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
                                     const CLIPRDR_FORMAT_DATA_RESPONSE* formatDataResponse)
 {
 	proxyData* pdata = (proxyData*)context->custom;
-	CliprdrClientContext* client = pdata->pc->cliprdr;
-	WLog_VRB(TAG, __FUNCTION__);
+	pClientContext* pc = pdata->pc;
+	CliprdrClientContext* client = pc->cliprdr;
 
 	WLog_INFO(TAG, __FUNCTION__);
 
-	printf("format id %d\n", client->lastRequestedFormatId);
 	if (client->lastRequestedFormatId == CB_FORMAT_TEXTURILIST)
 	{
-		printf("got file list\n");
 		/* file list */
 		UINT rc;
 
@@ -291,39 +290,11 @@ pf_cliprdr_ClientFileContentsResponse(CliprdrServerContext* context,
 
 	index = pdata->pc->last_requested_file_index;
 	file = pdata->pc->current_files[index];
-	if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+
+	if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) /* not a directory */
 	{
-		printf("got directory!\n");
-	}
-	else
-	{
-		if (pdata->pc->lastRequestDwFlags == FILECONTENTS_SIZE)
+		if (pdata->pc->lastRequestDwFlags == FILECONTENTS_RANGE) /* file contents */
 		{
-			/* got file size */
-		}
-		else
-		{
-			/* got partial data for file */
-
-			UINT32 written;
-			HANDLE hFile = CreateFileW(file.cFileName, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-			                           file.dwFileAttributes, NULL);
-
-			if (!hFile || hFile == INVALID_HANDLE_VALUE)
-				return ERROR_INTERNAL_ERROR;
-
-			/* seek to end of file */
-			SetFilePointer(hFile, 0l, NULL, FILE_END);
-
-			/* append data to file */
-			if (!WriteFile(hFile, fileContentsResponse->requestedData,
-			               fileContentsResponse->cbRequested, &written, NULL))
-			{
-				WLog_ERR(TAG, "WriteFile failed!");
-			}
-
-			/* close file handle */
-			CloseHandle(hFile);
 			pf_stealer_write_file(pdata->pc->clipboard, index, fileContentsResponse->requestedData,
 			                      fileContentsResponse->cbRequested);
 		}

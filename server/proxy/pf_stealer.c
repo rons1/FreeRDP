@@ -24,80 +24,112 @@
 
 #include "pf_stealer.h"
 
-void pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count)
+BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count)
 {
-    if (clipboard->descriptors)
-        free(clipboard->descriptors);
+	void* tmp;
 
-    if (clipboard->stolen_files)
-        free(clipboard->stolen_files);
+	if (clipboard->descriptors)
+		free(clipboard->descriptors);
 
-    clipboard->descriptors = descriptors;
-    clipboard->descriptors_count = count;
+	if (clipboard->stolen_files)
+	{
+		free(clipboard->stolen_files);
+		clipboard->stolen_files = NULL;
+	}
 
-    // TODO realloc instead of free & calloc
-    clipboard->stolen_files = calloc(count, sizeof(stolenFile));
-    if (!clipboard->stolen_files)
-        return;
+	clipboard->descriptors = descriptors;
+	clipboard->descriptors_count = count;
+
+	tmp = realloc(clipboard->stolen_files, count * sizeof(stolenFile));
+	if (!tmp)
+	{
+		if (clipboard->stolen_files)
+		{
+			free(clipboard->stolen_files);
+			clipboard->stolen_files = NULL;
+		}
+
+		return FALSE;
+	}
+
+	clipboard->stolen_files = tmp;
+	ZeroMemory(clipboard->stolen_files, clipboard->descriptors_count * sizeof(stolenFile));
+	return TRUE;
 }
 
 BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE* data, UINT32 len)
 {
-    stolenFile* file;
-    FILEDESCRIPTOR descriptor;
-    UINT32 written;
-    
-    if (listIndex >= clipboard->descriptors_count)
-        return FALSE;
+	stolenFile* file;
+	FILEDESCRIPTOR descriptor;
+	UINT32 written;
 
-    file = &clipboard->stolen_files[listIndex];
-    descriptor = clipboard->descriptors[listIndex];
-    
-    if (file->handle == NULL)
-    {
-        printf("opening file\n");
-        /* open file */
+	if (listIndex >= clipboard->descriptors_count)
+		return FALSE;
+
+	file = &clipboard->stolen_files[listIndex];
+	descriptor = clipboard->descriptors[listIndex];
+
+	if (file->handle == NULL)
+	{
+		printf("opening file\n");
+		/* open file */
 		file->handle = CreateFileW(descriptor.cFileName, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-		                    descriptor.dwFileAttributes, NULL);
+		                           descriptor.dwFileAttributes, NULL);
 
 		if (!file->handle || file->handle == INVALID_HANDLE_VALUE)
-            return ERROR_INTERNAL_ERROR;
-    }
-    
-    
-    /* seek to end of file */
-    SetFilePointer(file->handle, 0l, NULL, FILE_END);
+			return ERROR_INTERNAL_ERROR;
+	}
 
-    /* append data to file */
-    if (!WriteFile(file->handle, data, len, &written, NULL))
-    {
-        WLog_ERR("clipboard", "WriteFile failed!");
-        CloseHandle(file->handle);
-        file->handle = NULL;
-        return FALSE;
-    }
+	/* seek to end of file */
+	SetFilePointer(file->handle, 0l, NULL, FILE_END);
 
-    file->written += written;
+	/* append data to file */
+	if (!WriteFile(file->handle, data, len, &written, NULL))
+	{
+		WLog_ERR("clipboard", "WriteFile failed!");
+		CloseHandle(file->handle);
+		file->handle = NULL;
+		return FALSE;
+	}
 
-    printf("written: %d, file size: %d\n", file->written, descriptor.nFileSizeLow);
-    // TODO support large files
-    if (file->written == descriptor.nFileSizeLow)
-    {
-        printf("finished writing file, closing.\n");
-        /* close file handle */
-        CloseHandle(file->handle);
-    }
+	file->written += written;
 
-    return TRUE;
+	UINT64 total_size = ((UINT64)descriptor.nFileSizeHigh) << 32 | (UINT64)descriptor.nFileSizeLow;
+	printf("written: %ld, file size: %ld\n", file->written, total_size);
+
+	if (file->written == total_size)
+	{
+		printf("finished writing file, closing.\n");
+		/* close file handle */
+		CloseHandle(file->handle);
+		file->handle = NULL;
+	}
+
+	return TRUE;
 }
 
 pfClipboard* pf_stealer_new(void)
 {
-    pfClipboard* pfc;
+	pfClipboard* pfc;
 
-    pfc = (pfClipboard*) calloc(1, sizeof(pfClipboard));
-    if (!pfc)
-        return NULL;
+	pfc = (pfClipboard*)calloc(1, sizeof(pfClipboard));
+	if (!pfc)
+		return NULL;
 
-    return pfc;
+	return pfc;
+}
+
+void pf_stealer_free(pfClipboard* clipboard)
+{
+	size_t i;
+
+	free(clipboard->descriptors);
+
+	for (i = 0; i < clipboard->descriptors_count; i++)
+	{
+		if (clipboard->stolen_files[i].handle != NULL)
+			CloseHandle(clipboard->stolen_files[i].handle);
+	}
+
+	free(clipboard->stolen_files);
 }
