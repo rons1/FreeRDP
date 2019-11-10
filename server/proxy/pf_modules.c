@@ -201,28 +201,29 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, rdpContext* server, void* param)
 
 static void pf_modules_module_free(proxyModule* module)
 {
-	moduleExitFn exitFn;
+	if (!module)
+		return;
 
-	assert(module);
-	assert(module->handle);
-
-	exitFn = (moduleExitFn)GetProcAddress(module->handle, MODULE_EXIT_METHOD);
-
-	if (!exitFn)
+	if (module->handle)
 	{
-		WLog_ERR(TAG, "[%s]: GetProcAddress module_exit for %s failed!", __FUNCTION__,
-		         module->name);
-	}
-	else
-	{
-		if (!exitFn(module->ops))
+		moduleExitFn exitFn = (moduleExitFn)GetProcAddress(module->handle, MODULE_EXIT_METHOD);
+
+		if (!exitFn)
 		{
-			WLog_ERR(TAG, "[%s]: module_exit failed for %s!", __FUNCTION__, module->name);
+			WLog_ERR(TAG, "[%s]: GetProcAddress module_exit for %s failed!", __FUNCTION__,
+					module->name);
 		}
-	}
+		else
+		{
+			if (!exitFn(module->ops))
+			{
+				WLog_ERR(TAG, "[%s]: module_exit failed for %s!", __FUNCTION__, module->name);
+			}
+		}
 
-	FreeLibrary(module->handle);
-	module->handle = NULL;
+		FreeLibrary(module->handle);
+		module->handle = NULL;
+	}
 
 	free(module->name);
 	free(module->ops);

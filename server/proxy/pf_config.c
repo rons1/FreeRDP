@@ -212,51 +212,8 @@ static BOOL pf_config_load_modules(wIniFile* ini, proxyConfig* config)
 
 static BOOL pf_config_load_captures(wIniFile* ini, proxyConfig* config)
 {
-	const char* temp;
-
 	config->DecodeGFX = pf_config_get_bool(ini, "SessionCapture", "DecodeGFX");
-
-	if (!config->DecodeGFX)
-		return TRUE;
-
-	temp = pf_config_get_str(ini, "SessionCapture", "TempFramesDirectory");
-
-	if (!temp)
-		return FALSE;
-
-	config->TempFramesDirectory = strdup(temp);
-	if (!config->TempFramesDirectory)
-		return FALSE;
-
-	if (!PathFileExistsA(config->TempFramesDirectory))
-	{
-		if (!CreateDirectoryA(config->TempFramesDirectory, NULL))
-			goto error;
-	}
-
-	temp = pf_config_get_str(ini, "SessionCapture", "FullSessionsDirectory");
-
-	if (!temp)
-		goto error;
-
-	config->FullSessionsDirectory = strdup(temp);
-	if (!config->FullSessionsDirectory)
-		goto error;
-
-	if (!PathFileExistsA(config->FullSessionsDirectory))
-	{
-		if (!CreateDirectoryA(config->FullSessionsDirectory, NULL))
-			goto error;
-	}
-
 	return TRUE;
-
-error:
-	free(config->FullSessionsDirectory);
-	config->FullSessionsDirectory = NULL;
-	free(config->TempFramesDirectory);
-	config->TempFramesDirectory = NULL;
-	return FALSE;
 }
 
 BOOL pf_server_config_load(const char* path, proxyConfig* config)
@@ -347,14 +304,10 @@ void pf_server_config_print(proxyConfig* config)
 
 	CONFIG_PRINT_SECTION("SessionCapture");
 	CONFIG_PRINT_BOOL(config, DecodeGFX);
-	CONFIG_PRINT_STR(config, TempFramesDirectory);
-	CONFIG_PRINT_STR(config, FullSessionsDirectory);
 }
 
 void pf_server_config_free(proxyConfig* config)
 {
-	free(config->FullSessionsDirectory);
-	free(config->TempFramesDirectory);
 	free(config->TargetHost);
 	free(config->Host);
 	free(config);

@@ -20,7 +20,7 @@
  */
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#	include "config.h"
 #endif
 
 #include <errno.h>
@@ -41,6 +41,7 @@
 
 #include <winpr/crt.h>
 #include <winpr/synch.h>
+#include <winpr/crypto.h>
 
 #include "pf_channels.h"
 #include "pf_gdi.h"
@@ -70,13 +71,13 @@ static BOOL proxy_server_reactivate(rdpContext* ps, const rdpContext* pc)
 
 static void pf_OnErrorInfo(void* ctx, ErrorInfoEventArgs* e)
 {
-	pClientContext* pc = (pClientContext*) ctx;
+	pClientContext* pc = (pClientContext*)ctx;
 	pServerContext* ps = pc->pdata->ps;
 
 	if (e->code == ERRINFO_NONE)
 		return;
 
-	WLog_WARN(TAG, "received error info code: 0x%08"PRIu32", msg: %s", e->code,
+	WLog_WARN(TAG, "received error info code: 0x%08" PRIu32 ", msg: %s", e->code,
 	          freerdp_get_error_info_string(e->code));
 
 	/* forward error back to client */
@@ -86,7 +87,7 @@ static void pf_OnErrorInfo(void* ctx, ErrorInfoEventArgs* e)
 
 static BOOL pf_client_load_rdpsnd(pClientContext* pc, proxyConfig* config)
 {
-	rdpContext* context = (rdpContext*) pc;
+	rdpContext* context = (rdpContext*)pc;
 	pServerContext* ps = pc->pdata->ps;
 
 	/*
@@ -102,8 +103,8 @@ static BOOL pf_client_load_rdpsnd(pClientContext* pc, proxyConfig* config)
 			params[1] = "sys:proxy";
 		else
 			params[1] = "sys:fake";
-		
-		if (!freerdp_client_add_static_channel(context->settings, 2, (char**) params))
+
+		if (!freerdp_client_add_static_channel(context->settings, 2, (char**)params))
 			return FALSE;
 	}
 
@@ -118,7 +119,7 @@ static BOOL pf_client_load_rdpsnd(pClientContext* pc, proxyConfig* config)
  */
 static BOOL pf_client_pre_connect(freerdp* instance)
 {
-	pClientContext* pc = (pClientContext*) instance->context;
+	pClientContext* pc = (pClientContext*)instance->context;
 	pServerContext* ps = pc->pdata->ps;
 	proxyConfig* config = ps->pdata->config;
 	rdpSettings* settings = instance->settings;
@@ -154,8 +155,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	 * Register the channel listeners.
 	 * They are required to set up / tear down channels if they are loaded.
 	 */
-	PubSub_SubscribeChannelConnected(instance->context->pubSub,
-	                                 pf_OnChannelConnectedEventHandler);
+	PubSub_SubscribeChannelConnected(instance->context->pubSub, pf_OnChannelConnectedEventHandler);
 	PubSub_SubscribeChannelDisconnected(instance->context->pubSub,
 	                                    pf_OnChannelDisconnectedEventHandler);
 	PubSub_SubscribeErrorInfo(instance->context->pubSub, pf_OnErrorInfo);
@@ -172,8 +172,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 		return FALSE;
 	}
 
-	if (!freerdp_client_load_addins(instance->context->channels,
-	                                instance->settings))
+	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
 	{
 		WLog_ERR(TAG, "Failed to load addins");
 		return FALSE;
@@ -203,8 +202,8 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	context = instance->context;
 	settings = instance->settings;
 	update = instance->update;
-	pc = (pClientContext*) context;
-	ps = (rdpContext*) pc->pdata->ps;
+	pc = (pClientContext*)context;
+	ps = (rdpContext*)pc->pdata->ps;
 	config = pc->pdata->config;
 
 	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_POST_CONNECT, ps))
@@ -231,7 +230,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 		offscreen_cache_register_callbacks(update);
 		palette_cache_register_callbacks(update);
 	}
-	
+
 	pf_client_register_update_callbacks(update);
 
 	/*
@@ -241,7 +240,6 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	 */
 	return proxy_server_reactivate(ps, context);
 }
-
 
 /* This function is called whether a session ends by failure or success.
  * Clean up everything allocated by pre_connect and post_connect.
@@ -257,7 +255,7 @@ static void pf_client_post_disconnect(freerdp* instance)
 	if (!instance->context)
 		return;
 
-	context = (pClientContext*) instance->context;
+	context = (pClientContext*)instance->context;
 	pdata = context->pdata;
 
 	PubSub_UnsubscribeChannelConnected(instance->context->pubSub,
@@ -322,7 +320,7 @@ static BOOL pf_client_connect_without_nla(pClientContext* pc)
 
 static BOOL pf_client_connect(freerdp* instance)
 {
-	pClientContext* pc = (pClientContext*) instance->context;
+	pClientContext* pc = (pClientContext*)instance->context;
 	BOOL rc = FALSE;
 	BOOL retry_without_nla = FALSE;
 
@@ -386,7 +384,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 	 */
 	handles[64] = pdata->abort_event;
 
-	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_PRE_CONNECT, (rdpContext*) ps))
+	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_PRE_CONNECT, (rdpContext*)ps))
 	{
 		proxy_data_abort_connect(pdata);
 		return FALSE;
@@ -412,7 +410,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 
 		if (status == WAIT_FAILED)
 		{
-			WLog_ERR(TAG, "%s: WaitForMultipleObjects failed with %"PRIu32"", __FUNCTION__,
+			WLog_ERR(TAG, "%s: WaitForMultipleObjects failed with %" PRIu32 "", __FUNCTION__,
 			         status);
 			break;
 		}
@@ -478,9 +476,9 @@ static int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
  * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
  */
 static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host, UINT16 port,
-        const char* common_name,
-        const char* subject, const char* issuer,
-        const char* fingerprint, DWORD flags)
+                                             const char* common_name, const char* subject,
+                                             const char* issuer, const char* fingerprint,
+                                             DWORD flags)
 {
 	/* TODO: Add trust level to proxy configurable settings */
 	return 1;
@@ -505,13 +503,10 @@ static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host
  *
  * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
  */
-static DWORD pf_client_verify_changed_certificate_ex(freerdp* instance,
-        const char* host, UINT16 port,
-        const char* common_name,
-        const char* subject, const char* issuer,
-        const char* fingerprint,
-        const char* old_subject, const char* old_issuer,
-        const char* old_fingerprint, DWORD flags)
+static DWORD pf_client_verify_changed_certificate_ex(
+    freerdp* instance, const char* host, UINT16 port, const char* common_name, const char* subject,
+    const char* issuer, const char* fingerprint, const char* old_subject, const char* old_issuer,
+    const char* old_fingerprint, DWORD flags)
 {
 	/* TODO: Add trust level to proxy configurable settings */
 	return 1;
@@ -532,20 +527,9 @@ static BOOL pf_client_client_new(freerdp* instance, rdpContext* context)
 	return TRUE;
 }
 
-static void pf_client_client_free(freerdp* instance, rdpContext* context)
-{
-	pClientContext* pc = (pClientContext*) context;
-
-	if (!pc)
-		return;
-
-	free(pc->frames_dir);
-	pc->frames_dir = NULL;
-}
-
 static int pf_client_client_stop(rdpContext* context)
 {
-	pClientContext* pc = (pClientContext*) context;
+	pClientContext* pc = (pClientContext*)context;
 	proxyData* pdata = pc->pdata;
 
 	WLog_DBG(TAG, "aborting client connection");
@@ -575,7 +559,6 @@ int RdpClientEntry(RDP_CLIENT_ENTRY_POINTS* pEntryPoints)
 	pEntryPoints->ContextSize = sizeof(pClientContext);
 	/* Client init and finish */
 	pEntryPoints->ClientNew = pf_client_client_new;
-	pEntryPoints->ClientFree = pf_client_client_free;
 	pEntryPoints->ClientStop = pf_client_client_stop;
 	return 0;
 }

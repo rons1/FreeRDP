@@ -17,183 +17,103 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include <string.h>
 #include <winpr/image.h>
-#include <winpr/sysinfo.h>
-#include <winpr/path.h>
-#include <winpr/file.h>
 #include <freerdp/gdi/gdi.h>
+#include <winpr/winsock.h>
 
 #include "pf_context.h"
 #include "modules_api.h"
 #include "pf_log.h"
 
+#define HEADER_SIZE 6
+#define SESSION_INFO_PDU_BASE_SIZE 6
+#define SESSION_END_PDU_BASE_SIZE 0
+#define CAPTURED_FRAME_PDU_BASE_SIZE 0
+
+/* message types */
+#define MESSAGE_TYPE_SESSION_INFO 1
+#define MESSAGE_TYPE_CAPTURED_FRAME 2
+#define MESSAGE_TYPE_SESSION_END 3
+
 #define TAG PROXY_TAG("capture")
 
-static BOOL pf_capture_create_dir_if_not_exists(const char* path)
+static int capture_module_init_socket()
 {
-	if (PathFileExistsA(path))
-		return TRUE;
+	int status;
+	int sockfd;
+	struct sockaddr_in addr = { 0 };
+	sockfd = _socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	return CreateDirectoryA(path, NULL);
+	if (sockfd == -1)
+		return -1;
+
+	addr.sin_family = AF_INET;   /* host byte order */
+	addr.sin_port = htons(8889); /* short, network byte order */
+	inet_pton(AF_INET, "127.0.0.1", &(addr.sin_addr));
+
+	// addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	status = _connect(sockfd, (const struct sockaddr*)&addr, sizeof(addr));
+	if (status < 0)
+	{
+		close(sockfd);
+		return -1;
+	}
+
+	return sockfd;
 }
 
-static BOOL pf_capture_create_user_captures_dir(const char* base_dir, const char* username)
+static wStream* pf_capture_packet_new(UINT32 payload_size, UINT16 type)
 {
-	BOOL ret;
-	char* dir;
+	wStream* stream = Stream_New(NULL, HEADER_SIZE + payload_size);
+	if (!stream)
+		return NULL;
 
-	dir = GetCombinedPath(base_dir, username);
-
-	if (!dir)
-		return FALSE;
-
-	if (!pf_capture_create_dir_if_not_exists(dir))
-		goto out;
-
-	ret = TRUE;
-
-out:
-	free(dir);
-	return ret;
+	Stream_Write_UINT32(stream, payload_size);
+	Stream_Write_UINT16(stream, type);
+	return stream;
 }
 
-static BOOL pf_capture_create_current_session_captures_dir(pClientContext* pc)
+static BOOL pf_capture_send_packet(SOCKET sockfd, wStream* packet)
 {
-	proxyConfig* config = pc->pdata->config;
-	rdpSettings* settings = pc->context.settings;
-	const char* fmt = "%s/%s/%s_%02u-%02u-%" PRIu16 "_%02u-%02u-%02u-%03u";
-	int rc;
-	size_t size;
-	SYSTEMTIME localTime;
+	int nsent;
+	size_t len;
+	size_t chunk_len;
+	BYTE* buffer;
+	BOOL result = FALSE;
 
-	GetLocalTime(&localTime);
-
-	/* create sub-directory in current user's captures directory, for the specific session. */
-	rc = _snprintf(NULL, 0, fmt, config->TempFramesDirectory, settings->Username,
-	               settings->ServerHostname, localTime.wDay, localTime.wMonth, localTime.wYear,
-	               localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds);
-
-	if (rc < 0)
+	if (!packet)
 		return FALSE;
 
-	size = (size_t)rc;
+	buffer = Stream_Buffer(packet);
+	len = Stream_Capacity(packet);
 
-	/* `pc->frames_dir` will be used by proxy client for saving frames to storage. */
-	pc->frames_dir = malloc(size + 1);
-	if (!pc->frames_dir)
-		return FALSE;
+	while (len > 0)
+	{
+		chunk_len = len > 8092 ? 8092 : len;
+		nsent = _send(sockfd, (const char*)buffer, chunk_len, 0);
+		if (nsent == -1)
+		{
+			int errorn = WSAGetLastError();
+			printf("error: %d\n", errorn);
+			goto error;
+		}
 
-	rc = sprintf(pc->frames_dir, fmt, config->TempFramesDirectory, settings->Username,
-	             settings->ServerHostname, localTime.wDay, localTime.wMonth, localTime.wYear,
-	             localTime.wHour, localTime.wMinute, localTime.wSecond, localTime.wMilliseconds);
+		buffer += nsent;
+		len -= nsent;
+	}
 
-	if (rc < 0 || (size_t)rc != size)
-		goto error;
-
-	if (!pf_capture_create_dir_if_not_exists(pc->frames_dir))
-		goto error;
-
-	return TRUE;
-
+	result = TRUE;
 error:
-	free(pc->frames_dir);
-	return FALSE;
-}
-
-/* creates a directory to store captured session frames.
- *
- * @context: current session.
- *
- * directory path will be: base_dir/username/session-start-date.
- *
- * it is important to call this function only after the connection is fully established, as it uses
- * settings->Username and settings->ServerHostname values to create the directory. After the
- * connection established, we know that those values are valid.
- */
-static BOOL pf_capture_create_session_directory(pClientContext* pc)
-{
-	proxyConfig* config = pc->pdata->config;
-	rdpSettings* settings = pc->context.settings;
-
-	if (!pf_capture_create_user_captures_dir(config->TempFramesDirectory, settings->Username))
-		return FALSE;
-
-	if (!pf_capture_create_current_session_captures_dir(pc))
-		return FALSE;
-
-	return TRUE;
-}
-
-static BOOL pf_capture_save_frame(pClientContext* pc, const BYTE* frame)
-{
-	rdpSettings* settings;
-	size_t size;
-	int rc;
-	char* file_path = NULL;
-	const char* fmt = "%s/%" PRIu64 ".bmp";
-
-	if (!pc->frames_dir)
-		return FALSE;
-
-	rc = _snprintf(NULL, 0, fmt, pc->frames_dir, pc->frames_count);
-	if (rc < 0)
-		return FALSE;
-
-	size = (size_t)rc;
-	file_path = malloc(size + 1);
-	if (!file_path)
-		return FALSE;
-
-	rc = sprintf(file_path, fmt, pc->frames_dir, pc->frames_count);
-	if (rc < 0 || (size_t)rc != size)
-		goto out;
-
-	pc->frames_count++;
-
-	settings = pc->context.settings;
-	rc = winpr_bitmap_write(file_path, frame, settings->DesktopWidth, settings->DesktopHeight,
-	                        settings->ColorDepth);
-
-out:
-	free(file_path);
-	return rc;
-}
-
-/*
- * moves all frames of current session to a directory that is used for saving finished sessions
- * frames
- */
-static BOOL pf_capture_move_frames_from_temp_to_full_sessions_dir(pClientContext* pc)
-{
-	proxyConfig* config;
-	BOOL ret;
-	char* dst;
-	char* index;
-
-	index = strchr(pc->frames_dir, '/');
-	if (!index)
-		return FALSE;
-
-	config = pc->pdata->config;
-	dst = GetCombinedPath(config->FullSessionsDirectory, index + 1);
-	if (!dst)
-		return FALSE;
-
-	WLog_INFO(TAG, "moving %s to %s", pc->frames_dir, dst);
-	ret = MoveFileEx(pc->frames_dir, dst, MOVEFILE_WRITE_THROUGH | MOVEFILE_REPLACE_EXISTING);
-	free(dst);
-	return ret;
+	Stream_Free(packet, TRUE);
+	return result;
 }
 
 static BOOL pf_capture_session_end(moduleOperations* module, rdpContext* context)
 {
 	pServerContext* ps;
 	pClientContext* pc;
-	proxyConfig* config;
-	BOOL ret = TRUE;
-	char* dir;
+	SOCKET socket;
+	BOOL ret;
 
 	ps = (pServerContext*)context;
 	if (!ps)
@@ -203,29 +123,31 @@ static BOOL pf_capture_session_end(moduleOperations* module, rdpContext* context
 	if (!pc)
 		return FALSE;
 
-	if (pc->frames_count == 0)
-	{
-		/* session ended but no frames were drawn (connection wasn't fully established). no need to
-		 * move the frames to full session directory. */
+	socket = (SOCKET)module->GetSessionData(module, context);
 
-		return TRUE;
-	}
+	wStream* s = pf_capture_packet_new(SESSION_END_PDU_BASE_SIZE, MESSAGE_TYPE_SESSION_END);
+	ret = pf_capture_send_packet(socket, s);
+	closesocket(socket);
+	return ret;
+}
 
-	config = ps->pdata->config;
+static BOOL pf_capture_send_frame_to_service(pClientContext* pc, SOCKET socket, const BYTE* buffer)
+{
+	BOOL ret = FALSE;
+	UINT32 img_size;
+	rdpSettings* settings = pc->context.settings;
+	wStream* s;
+	wStream* image_header = winpr_bitmap_construct_header(
+	    buffer, settings->DesktopWidth, settings->DesktopHeight, settings->ColorDepth, &img_size);
 
-	/* make sure a directory exists for current username in full sessions directory */
-	dir = GetCombinedPath(config->FullSessionsDirectory, pc->context.settings->Username);
-	if (!dir)
-		return FALSE;
+	s = pf_capture_packet_new(CAPTURED_FRAME_PDU_BASE_SIZE + Stream_Length(image_header) + img_size,
+	                          MESSAGE_TYPE_CAPTURED_FRAME);
 
-	if (!pf_capture_create_dir_if_not_exists(dir))
-		ret = FALSE;
+	Stream_Write(s, Stream_Buffer(image_header), Stream_Length(image_header)); /* image header */
+	Stream_Write(s, buffer, img_size);                                         /* image data */
 
-	free(dir);
-
-	if (!pf_capture_move_frames_from_temp_to_full_sessions_dir(pc))
-		ret = FALSE;
-
+	ret = pf_capture_send_packet(socket, s);
+	Stream_Free(image_header, TRUE);
 	return ret;
 }
 
@@ -241,8 +163,12 @@ static BOOL pf_capture_client_end_paint(moduleOperations* module, rdpContext* co
 	if (gdi->primary->hdc->hwnd->ninvalid < 1)
 		return TRUE;
 
-	if (!pf_capture_save_frame(pc, gdi->primary_buffer))
-		WLog_ERR(TAG, "failed to save captured frame!");
+	SOCKET socket = (SOCKET)module->GetSessionData(module, context);
+	if (!pf_capture_send_frame_to_service(pc, socket, gdi->primary_buffer))
+	{
+		WLog_ERR(TAG, "pf_capture_send_frame_to_service failed!");
+		return FALSE;
+	}
 
 	gdi->primary->hdc->hwnd->invalid->null = TRUE;
 	gdi->primary->hdc->hwnd->ninvalid = 0;
@@ -251,15 +177,11 @@ static BOOL pf_capture_client_end_paint(moduleOperations* module, rdpContext* co
 
 static BOOL pf_capture_client_post_connect(moduleOperations* module, rdpContext* context)
 {
+	SOCKET socket;
 	pServerContext* ps = (pServerContext*)context;
 	pClientContext* pc = ps->pdata->pc;
-	proxyConfig* config = ps->pdata->config;
-
-	if (!config->DecodeGFX)
-	{
-		WLog_ERR(TAG, "proxy is configured to not decode GFX, can not capture session, denying connection.");
-		return FALSE;
-	}
+	wStream* s;
+	UINT16 username_length;
 
 	if (!pc->context.settings->SupportGraphicsPipeline)
 	{
@@ -267,14 +189,26 @@ static BOOL pf_capture_client_post_connect(moduleOperations* module, rdpContext*
 		return FALSE;
 	}
 
-	if (!pf_capture_create_session_directory(pc))
+	socket = capture_module_init_socket();
+	if (socket == -1)
 	{
-		WLog_ERR(TAG, "pf_capture_create_session_directory failed!");
+		WLog_ERR(TAG, "failed to establish a connection");
 		return FALSE;
 	}
 
-	WLog_INFO(TAG, "created temporary frames directory: %s", pc->frames_dir);
-	return TRUE;
+	// save socket descriptor for current session.
+	module->SetSessionData(module, context, (void*)socket);
+
+	username_length = strlen(pc->context.settings->Username);
+	s = pf_capture_packet_new(SESSION_INFO_PDU_BASE_SIZE + username_length,
+	                          MESSAGE_TYPE_SESSION_INFO);
+
+	Stream_Write_UINT16(s, username_length); /* username length (2 bytes) */
+	Stream_Write(s, pc->context.settings->Username,
+	             username_length); /* username (username_length bytes) */
+	Stream_Write_UINT16(s, pc->context.settings->DesktopWidth);  /* desktop width (2 bytes) */
+	Stream_Write_UINT16(s, pc->context.settings->DesktopHeight); /* desktop height (2 bytes) */
+	return pf_capture_send_packet(socket, s);
 }
 
 static BOOL pf_capture_server_post_connect(moduleOperations* module, rdpContext* context)
@@ -296,7 +230,6 @@ BOOL module_init(moduleOperations* module)
 	module->ClientEndPaint = pf_capture_client_end_paint;
 	module->ServerPostConnect = pf_capture_server_post_connect;
 	module->SessionEnd = pf_capture_session_end;
-
 	return TRUE;
 }
 

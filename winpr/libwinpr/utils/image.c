@@ -29,7 +29,6 @@
 #include <winpr/image.h>
 
 #include "lodepng/lodepng.h"
-#include <winpr/stream.h>
 
 #include "../log.h"
 #define TAG WINPR_TAG("utils.image")
@@ -100,24 +99,11 @@ static BOOL readBitmapInfoHeader(wStream* s, WINPR_BITMAP_INFO_HEADER* bi)
 	return TRUE;
 }
 
-/**
- * Refer to "Compressed Image File Formats: JPEG, PNG, GIF, XBM, BMP" book
- */
-
-int winpr_bitmap_write(const char* filename, const BYTE* data, int width, int height, int bpp)
+wStream* winpr_bitmap_construct_header(const BYTE* data, int width, int height, int bpp, UINT32* img_size)
 {
-	FILE* fp;
 	WINPR_BITMAP_FILE_HEADER bf;
 	WINPR_BITMAP_INFO_HEADER bi;
 	wStream* s;
-	int ret = -1;
-	fp = fopen(filename, "w+b");
-
-	if (!fp)
-	{
-		WLog_ERR(TAG, "failed to open file %s", filename);
-		return -1;
-	}
 
 	bf.bfType[0] = 'B';
 	bf.bfType[1] = 'M';
@@ -136,6 +122,10 @@ int winpr_bitmap_write(const char* filename, const BYTE* data, int width, int he
 	bi.biClrUsed = 0;
 	bi.biClrImportant = 0;
 	bi.biSize = sizeof(WINPR_BITMAP_INFO_HEADER);
+
+	if (img_size)
+		*img_size = bi.biSizeImage;
+
 	s = Stream_New(NULL, sizeof(WINPR_BITMAP_FILE_HEADER) + sizeof(WINPR_BITMAP_INFO_HEADER));
 
 	if (!s)
@@ -148,9 +138,38 @@ int winpr_bitmap_write(const char* filename, const BYTE* data, int width, int he
 		goto fail;
 
 	Stream_SealLength(s);
+	return s;
+
+fail:
+	Stream_Free(s, TRUE);
+	return NULL;
+}
+
+/**
+ * Refer to "Compressed Image File Formats: JPEG, PNG, GIF, XBM, BMP" book
+ */
+
+int winpr_bitmap_write(const char* filename, const BYTE* data, int width, int height, int bpp)
+{
+	FILE* fp;
+	wStream* s;
+	UINT32 img_size;
+
+	int ret = -1;
+	fp = fopen(filename, "w+b");
+
+	if (!fp)
+	{
+		WLog_ERR(TAG, "failed to open file %s", filename);
+		return -1;
+	}
+
+	s = winpr_bitmap_construct_header(data, width, height, bpp, &img_size);
+	if (!s)
+		return -1;
 
 	if (fwrite(Stream_Buffer(s), Stream_Length(s), 1, fp) != 1 ||
-	    fwrite((void*) data, bi.biSizeImage, 1, fp) != 1)
+	    fwrite((void*) data, img_size, 1, fp) != 1)
 		goto fail;
 
 	ret = 1;
