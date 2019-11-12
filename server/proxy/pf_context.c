@@ -232,6 +232,12 @@ proxyData* proxy_data_new(void)
 	pdata->modules_info->keyClone = HashTable_StringClone;
 	pdata->modules_info->keyFree = HashTable_StringFree;
 
+	if (!(pdata->gfx_server_ready = CreateEvent(NULL, TRUE, FALSE, NULL)))
+	{
+		proxy_data_free(pdata);
+		return NULL;
+	}
+
 	return pdata;
 error:
 	proxy_data_free(pdata);
