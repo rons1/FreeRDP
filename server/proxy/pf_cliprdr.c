@@ -224,6 +224,8 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	pClientContext* pc = pdata->pc;
 	CliprdrClientContext* client = pc->cliprdr;
+	FILEDESCRIPTOR* files;
+	UINT32 files_count;
 
 	WLog_INFO(TAG, __FUNCTION__);
 
@@ -232,19 +234,12 @@ pf_cliprdr_ClientFormatDataResponse(CliprdrServerContext* context,
 		/* file list */
 		UINT rc;
 
-		if (pc->current_files)
-		{
-			free(pc->current_files);
-			pc->current_files = NULL;
-		}
-
 		rc = cliprdr_parse_file_list(formatDataResponse->requestedFormatData,
-		                             formatDataResponse->dataLen, &pc->current_files,
-		                             &pc->current_files_count);
+		                             formatDataResponse->dataLen, &files, &files_count);
 		if (rc != NO_ERROR)
 			return ERROR_INTERNAL_ERROR;
 
-		pf_stealer_set_files(pc->clipboard, pc->current_files, pc->current_files_count);
+		pf_stealer_set_files(pc->clipboard, files, files_count);
 	}
 
 	if (pf_cliprdr_is_text_format(client->lastRequestedFormatId))
@@ -289,7 +284,7 @@ pf_cliprdr_ClientFileContentsResponse(CliprdrServerContext* context,
 		return CHANNEL_RC_OK;
 
 	index = pdata->pc->last_requested_file_index;
-	file = pdata->pc->current_files[index];
+	file = pdata->pc->clipboard->descriptors[index];
 
 	if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) /* not a directory */
 	{

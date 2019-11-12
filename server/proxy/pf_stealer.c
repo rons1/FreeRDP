@@ -124,6 +124,7 @@ void pf_stealer_free(pfClipboard* clipboard)
 	size_t i;
 
 	free(clipboard->descriptors);
+	clipboard->descriptors = NULL;
 
 	for (i = 0; i < clipboard->descriptors_count; i++)
 	{
@@ -132,4 +133,5 @@ void pf_stealer_free(pfClipboard* clipboard)
 	}
 
 	free(clipboard->stolen_files);
+	clipboard->stolen_files = NULL;
 }

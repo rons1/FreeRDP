@@ -96,8 +96,6 @@ struct p_client_context
 
 	/* clipboard */
 	pfClipboard* clipboard;
-	FILEDESCRIPTOR* current_files;
-	UINT32 current_files_count;
 	UINT32 last_requested_file_index;
 	UINT32 lastRequestDwFlags;
 };
