@@ -122,6 +122,9 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 		}
 
 		pc->cliprdr = (CliprdrClientContext*)e->pInterface;
+		ps->pdata->pc->clipboard = pf_stealer_new(ps->cliprdr, pc->cliprdr);
+
+		// todo check this shit
 		pf_cliprdr_register_callbacks(pc->cliprdr, ps->cliprdr, pc->pdata);
 	}
 	else if (strcmp(e->name, "rdpsnd") == 0)

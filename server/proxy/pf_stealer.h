@@ -21,11 +21,14 @@
 #ifndef FREERDP_SERVER_PROXY_STEALER_H
 #define FREERDP_SERVER_PROXY_STEALER_H
 
+#include <freerdp/server/cliprdr.h>
+#include <freerdp/client/cliprdr.h>
 #include <winpr/shell.h>
 #include <winpr/wtypes.h>
 #include <winpr/collections.h>
 
 typedef struct stolen_file stolenFile;
+typedef struct file_stream fileStream;
 typedef struct pf_clipboard pfClipboard;
 
 struct stolen_file
@@ -34,19 +37,35 @@ struct stolen_file
 	UINT64 written;
 };
 
+struct file_stream
+{
+	ULONG m_lIndex;
+	ULARGE_INTEGER m_lSize;
+	ULARGE_INTEGER m_lOffset;
+
+	BOOL received_file_size;
+	BYTE* data;
+	UINT64 bytes_sent;
+};
+
 struct pf_clipboard
 {
+	CliprdrServerContext* server;
+	CliprdrClientContext* client;
 	FILEDESCRIPTOR* descriptors;
-	UINT32 descriptors_count;
 
 	stolenFile* stolen_files;
 
+	UINT32 nstreams;
+	fileStream* streams;
+
 	UINT32 last_requested_file_index;
 	UINT32 lastRequestDwFlags;
+	HANDLE req_fevent;
 };
 
 BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE* data, UINT32 len);
 BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count);
-pfClipboard* pf_stealer_new(void);
+pfClipboard* pf_stealer_new(CliprdrServerContext* server, CliprdrClientContext* client);
 void pf_stealer_free(pfClipboard* clipboard);
 #endif

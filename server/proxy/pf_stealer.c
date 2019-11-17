@@ -38,22 +38,22 @@ BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, U
 	}
 
 	clipboard->descriptors = descriptors;
-	clipboard->descriptors_count = count;
+	clipboard->nstreams = count;
 
-	tmp = realloc(clipboard->stolen_files, count * sizeof(stolenFile));
+	tmp = realloc(clipboard->streams, count * sizeof(fileStream));
 	if (!tmp)
 	{
-		if (clipboard->stolen_files)
+		if (clipboard->streams)
 		{
-			free(clipboard->stolen_files);
-			clipboard->stolen_files = NULL;
+			free(clipboard->streams);
+			clipboard->streams = NULL;
 		}
 
 		return FALSE;
 	}
 
-	clipboard->stolen_files = tmp;
-	ZeroMemory(clipboard->stolen_files, clipboard->descriptors_count * sizeof(stolenFile));
+	clipboard->streams = tmp;
+	ZeroMemory(clipboard->streams, clipboard->nstreams * sizeof(fileStream));
 	return TRUE;
 }
 
@@ -63,7 +63,7 @@ BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE*
 	FILEDESCRIPTOR descriptor;
 	UINT32 written;
 
-	if (listIndex >= clipboard->descriptors_count)
+	if (listIndex >= clipboard->nstreams)
 		return FALSE;
 
 	file = &clipboard->stolen_files[listIndex];
@@ -108,7 +108,7 @@ BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE*
 	return TRUE;
 }
 
-pfClipboard* pf_stealer_new(void)
+pfClipboard* pf_stealer_new(CliprdrServerContext* server, CliprdrClientContext* client)
 {
 	pfClipboard* pfc;
 
@@ -116,6 +116,8 @@ pfClipboard* pf_stealer_new(void)
 	if (!pfc)
 		return NULL;
 
+	pfc->server = server;
+	pfc->client = client;
 	return pfc;
 }
 
@@ -126,12 +128,12 @@ void pf_stealer_free(pfClipboard* clipboard)
 	free(clipboard->descriptors);
 	clipboard->descriptors = NULL;
 
-	for (i = 0; i < clipboard->descriptors_count; i++)
-	{
-		if (clipboard->stolen_files[i].handle != NULL)
-			CloseHandle(clipboard->stolen_files[i].handle);
-	}
+	// for (i = 0; i < clipboard->nstreams; i++)
+	// {
+	// 	if (clipboard->stolen_files[i].handle != NULL)
+	// 		CloseHandle(clipboard->stolen_files[i].handle);
+	// }
 
-	free(clipboard->stolen_files);
+	free(clipboard->streams);
 	clipboard->stolen_files = NULL;
 }

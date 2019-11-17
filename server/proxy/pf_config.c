@@ -342,9 +342,12 @@ void pf_server_config_print(proxyConfig* config)
 	}
 
 	CONFIG_PRINT_SECTION("Clipboard");
-	CONFIG_PRINT_BOOL(config, TextOnly);
-	if (config->MaxTextLength > 0)
-		CONFIG_PRINT_UINT32(config, MaxTextLength);
+	if (config->Clipboard)
+	{
+		CONFIG_PRINT_BOOL(config, TextOnly);
+		if (config->MaxTextLength > 0)
+			CONFIG_PRINT_UINT32(config, MaxTextLength);
+	}
 
 	CONFIG_PRINT_SECTION("GFXSettings");
 	CONFIG_PRINT_BOOL(config, DecodeGFX);
