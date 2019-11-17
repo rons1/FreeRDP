@@ -54,6 +54,7 @@ typedef void (*moduleAbortConnect)(moduleOperations*, rdpContext*);
 typedef struct connection_info connectionInfo;
 typedef struct proxy_keyboard_event_info proxyKeyboardEventInfo;
 typedef struct proxy_mouse_event_info proxyMouseEventInfo;
+typedef struct proxy_file_copy_event proxyFileCopyEventInfo;
 
 /* represents a set of operations that a module can do */
 struct module_operations
@@ -71,6 +72,7 @@ struct module_operations
 	/* proxy filters a module can set these function pointers to register filters. */
 	proxyFilterFn KeyboardEvent;
 	proxyFilterFn MouseEvent;
+	proxyFilterFn ClipboardFileCopy;
 };
 
 /* filter events parameters */
@@ -87,6 +89,13 @@ struct proxy_mouse_event_info
 	UINT16 flags;
 	UINT16 x;
 	UINT16 y;
+};
+
+struct proxy_file_copy_event
+{
+	BOOL client_to_server; /* direction */
+	BYTE* data;            /* file data */
+	UINT64 data_len;       /* file size */
 };
 #define WINPR_PACK_POP
 #include <winpr/pack.h>

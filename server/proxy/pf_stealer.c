@@ -31,10 +31,10 @@ BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, U
 	if (clipboard->descriptors)
 		free(clipboard->descriptors);
 
-	if (clipboard->stolen_files)
+	if (clipboard->streams)
 	{
-		free(clipboard->stolen_files);
-		clipboard->stolen_files = NULL;
+		free(clipboard->streams);
+		clipboard->streams = NULL;
 	}
 
 	clipboard->descriptors = descriptors;
@@ -54,57 +54,6 @@ BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, U
 
 	clipboard->streams = tmp;
 	ZeroMemory(clipboard->streams, clipboard->nstreams * sizeof(fileStream));
-	return TRUE;
-}
-
-BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE* data, UINT32 len)
-{
-	stolenFile* file;
-	FILEDESCRIPTOR descriptor;
-	UINT32 written;
-
-	if (listIndex >= clipboard->nstreams)
-		return FALSE;
-
-	file = &clipboard->stolen_files[listIndex];
-	descriptor = clipboard->descriptors[listIndex];
-
-	if (file->handle == NULL)
-	{
-		printf("opening file\n");
-		/* open file */
-		file->handle = CreateFileW(descriptor.cFileName, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
-		                           descriptor.dwFileAttributes, NULL);
-
-		if (!file->handle || file->handle == INVALID_HANDLE_VALUE)
-			return ERROR_INTERNAL_ERROR;
-	}
-
-	/* seek to end of file */
-	SetFilePointer(file->handle, 0l, NULL, FILE_END);
-
-	/* append data to file */
-	if (!WriteFile(file->handle, data, len, &written, NULL))
-	{
-		WLog_ERR("clipboard", "WriteFile failed!");
-		CloseHandle(file->handle);
-		file->handle = NULL;
-		return FALSE;
-	}
-
-	file->written += written;
-
-	UINT64 total_size = ((UINT64)descriptor.nFileSizeHigh) << 32 | (UINT64)descriptor.nFileSizeLow;
-	printf("written: %ld, file size: %ld\n", file->written, total_size);
-
-	if (file->written == total_size)
-	{
-		printf("finished writing file, closing.\n");
-		/* close file handle */
-		CloseHandle(file->handle);
-		file->handle = NULL;
-	}
-
 	return TRUE;
 }
 
@@ -128,12 +77,12 @@ void pf_stealer_free(pfClipboard* clipboard)
 	free(clipboard->descriptors);
 	clipboard->descriptors = NULL;
 
-	// for (i = 0; i < clipboard->nstreams; i++)
-	// {
-	// 	if (clipboard->stolen_files[i].handle != NULL)
-	// 		CloseHandle(clipboard->stolen_files[i].handle);
-	// }
+	for (i = 0; i < clipboard->nstreams; i++)
+	{
+		if (clipboard->streams[i].data)
+			free(clipboard->streams[i].data);
+	}
 
 	free(clipboard->streams);
-	clipboard->stolen_files = NULL;
+	clipboard->streams = NULL;
 }

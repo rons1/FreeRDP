@@ -39,10 +39,8 @@ static modules_list* proxy_modules = NULL;
 typedef BOOL (*moduleInitFn)(moduleOperations* ops);
 typedef BOOL (*moduleExitFn)(moduleOperations* ops);
 
-static const char* FILTER_TYPE_STRINGS[] = {
-	"KEYBOARD_EVENT",
-	"MOUSE_EVENT",
-};
+static const char* FILTER_TYPE_STRINGS[] = { "KEYBOARD_EVENT", "MOUSE_EVENT",
+	                                         "CLIPBOARD_FILE_COPY" };
 
 static const char* HOOK_TYPE_STRINGS[] = {
 	"CLIENT_PRE_CONNECT",
@@ -52,7 +50,7 @@ static const char* HOOK_TYPE_STRINGS[] = {
 
 static const char* pf_modules_get_filter_type_string(PF_FILTER_TYPE result)
 {
-	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_MOUSE)
+	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_FILE_COPY)
 		return FILTER_TYPE_STRINGS[result];
 	else
 		return "FILTER_UNKNOWN";
@@ -155,6 +153,10 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, rdpContext* server, void* param)
 
 			case FILTER_TYPE_MOUSE:
 				IFCALLRET(ops->MouseEvent, result, ops, server, param);
+				break;
+
+			case FILTER_TYPE_FILE_COPY:
+				IFCALLRET(ops->ClipboardFileCopy, result, ops, server, param);
 				break;
 		}
 
