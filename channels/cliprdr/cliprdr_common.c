@@ -111,7 +111,9 @@ static void cliprdr_write_file_contents_response(wStream* s,
                                                  const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
 	Stream_Write_UINT32(s, response->streamId); /* streamId (4 bytes) */
-	Stream_Write(s, response->requestedData, response->cbRequested);
+
+	if (response->requestedData)
+		Stream_Write(s, response->requestedData, response->cbRequested);
 }
 
 wStream* cliprdr_packet_lock_clipdata_new(const CLIPRDR_LOCK_CLIPBOARD_DATA* lockClipboardData)

@@ -152,8 +152,6 @@ pClientContext* pf_context_create_client_context(rdpSettings* clientSettings)
 	if (!pf_context_copy_settings(context->settings, clientSettings))
 		goto error;
 
-	pc->clipboard = pf_stealer_new();
-
 	return pc;
 error:
 	freerdp_client_context_free(context);
