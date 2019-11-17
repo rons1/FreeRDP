@@ -21,21 +21,15 @@
 #ifndef FREERDP_SERVER_PROXY_STEALER_H
 #define FREERDP_SERVER_PROXY_STEALER_H
 
-#include <freerdp/server/cliprdr.h>
-#include <freerdp/client/cliprdr.h>
 #include <winpr/shell.h>
 #include <winpr/wtypes.h>
 #include <winpr/collections.h>
 
-typedef struct stolen_file stolenFile;
+#include <freerdp/server/cliprdr.h>
+#include <freerdp/client/cliprdr.h>
+
 typedef struct file_stream fileStream;
 typedef struct pf_clipboard pfClipboard;
-
-struct stolen_file
-{
-	HANDLE handle;
-	UINT64 written;
-};
 
 struct file_stream
 {
@@ -46,6 +40,7 @@ struct file_stream
 	BOOL received_file_size;
 	BYTE* data;
 	UINT64 bytes_sent;
+	BOOL passed_filter;
 };
 
 struct pf_clipboard
@@ -53,8 +48,6 @@ struct pf_clipboard
 	CliprdrServerContext* server;
 	CliprdrClientContext* client;
 	FILEDESCRIPTOR* descriptors;
-
-	stolenFile* stolen_files;
 
 	UINT32 nstreams;
 	fileStream* streams;

@@ -38,6 +38,11 @@ typedef BOOL (*proxyHookFn)(proxyData*);
  */
 typedef BOOL (*proxyFilterFn)(proxyData*, void*);
 
+typedef struct connection_info connectionInfo;
+typedef struct proxy_keyboard_event_info proxyKeyboardEventInfo;
+typedef struct proxy_mouse_event_info proxyMouseEventInfo;
+typedef struct proxy_file_copy_event proxyFileCopyEventInfo;
+
 /* describes a plugin: name, description and callbacks to execute. */
 typedef struct proxy_plugin
 {
@@ -62,6 +67,7 @@ typedef struct proxy_plugin
 	proxyFilterFn ClientChannelData; /* passthrough channels data */
 	proxyFilterFn ServerChannelData; /* passthrough channels data */
 	proxyFilterFn ServerFetchTargetAddr;
+	proxyFilterFn ClipboardFileCopy;
 } proxyPlugin;
 
 /*
@@ -133,6 +139,13 @@ typedef struct fetch_target_event_info
 	 */
 	ProxyFetchTargetMethod fetch_method;
 } proxyFetchTargetEventInfo;
+
+struct proxy_file_copy_event
+{
+	BOOL client_to_server; /* direction */
+	BYTE* data;            /* file data */
+	UINT64 data_len;       /* file size */
+};
 #define WINPR_PACK_POP
 #include <winpr/pack.h>
 

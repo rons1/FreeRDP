@@ -40,7 +40,7 @@ static wArrayList* handles_list = NULL; /* list of module handles to free at shu
 typedef BOOL (*moduleEntryPoint)(proxyPluginsManager* plugins_manager);
 
 static const char* FILTER_TYPE_STRINGS[] = { "KEYBOARD_EVENT", "MOUSE_EVENT", "CLIENT_CHANNEL_DATA",
-	                                         "SERVER_CHANNEL_DATA", "SERVER_FETCH_TARGET_ADDR" };
+	                                         "SERVER_CHANNEL_DATA", "SERVER_FETCH_TARGET_ADDR", "CLIPBOARD_FILE_COPY" };
 
 static const char* HOOK_TYPE_STRINGS[] = {
 	"CLIENT_PRE_CONNECT",  "CLIENT_POST_CONNECT",  "CLIENT_LOGIN_FAILURE", "CLIENT_END_PAINT",
@@ -158,6 +158,7 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 				IFCALLRET(plugin->ClientChannelData, result, pdata, param);
 				break;
 
+<<<<<<< HEAD
 			case FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA:
 				IFCALLRET(plugin->ServerChannelData, result, pdata, param);
 				break;
@@ -168,6 +169,11 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 
 			default:
 				WLog_ERR(TAG, "invalid filter called");
+=======
+			case FILTER_TYPE_FILE_COPY:
+				IFCALLRET(ops->ClipboardFileCopy, result, ops, server, param);
+				break;
+>>>>>>> wip3
 		}
 
 		if (!result)
