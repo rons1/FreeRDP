@@ -32,10 +32,10 @@ enum _PF_FILTER_TYPE
 	FILTER_TYPE_KEYBOARD,
 	FILTER_TYPE_MOUSE,
 	FILTER_TYPE_CLIENT_PASSTHROUGH_CHANNEL_DATA,
-
 	FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA,
 	FILTER_TYPE_SERVER_FETCH_TARGET_ADDR,
 
+	FILTER_TYPE_PRE_FILE_COPY,
 	FILTER_TYPE_FILE_COPY,
 	FILTER_LAST
 };
@@ -63,6 +63,7 @@ void pf_modules_list_loaded_plugins(void);
 BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param);
 BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata);
 
+BOOL pf_modules_is_filter_registered(PF_FILTER_TYPE type);
 void pf_modules_free(void);
 
 #endif /* FREERDP_SERVER_PROXY_MODULES_H */

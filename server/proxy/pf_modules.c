@@ -173,7 +173,14 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 			case FILTER_TYPE_FILE_COPY:
 				IFCALLRET(ops->ClipboardFileCopy, result, ops, server, param);
 				break;
+<<<<<<< HEAD
 >>>>>>> wip3
+=======
+
+			case FILTER_TYPE_PRE_FILE_COPY:
+				IFCALLRET(ops->ClipboardPreFileCopy, result, ops, server, param);
+				break;
+>>>>>>> wip4
 		}
 
 		if (!result)
@@ -404,6 +411,7 @@ error:
 	return FALSE;
 }
 
+<<<<<<< HEAD
 void pf_modules_free(void)
 {
 	int index;
@@ -436,3 +444,42 @@ void pf_modules_free(void)
 		handles_list = NULL;
 	}
 }
+=======
+BOOL pf_modules_is_filter_registered(PF_FILTER_TYPE type)
+{
+	size_t i, count;
+
+	if (proxy_modules == NULL)
+		return FALSE;
+
+	count = ArrayList_Count(proxy_modules);
+	for (i = 0; i < count; i++)
+	{
+		proxyModule* module = (proxyModule*)ArrayList_GetItem(proxy_modules, i);
+
+		switch (type)
+		{
+			case FILTER_TYPE_PRE_FILE_COPY:
+				if (module->ops->ClipboardPreFileCopy)
+					return TRUE;
+				break;
+			case FILTER_TYPE_FILE_COPY:
+				if (module->ops->ClipboardFileCopy)
+					return TRUE;
+				break;
+			case FILTER_TYPE_KEYBOARD:
+				if (module->ops->KeyboardEvent)
+					return TRUE;
+				break;
+			case FILTER_TYPE_MOUSE:
+				if (module->ops->MouseEvent)
+					return TRUE;
+				break;
+			default:
+				return FALSE;
+		}
+	}
+
+	return FALSE;
+}
+>>>>>>> wip4

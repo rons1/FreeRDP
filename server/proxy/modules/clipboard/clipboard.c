@@ -24,14 +24,15 @@
 
 #define TAG PROXY_TAG("modules.clipboard")
 
-static BOOL clipboard_filter_file_copy(moduleOperations* module, rdpContext* context, void* param)
+static BOOL clipboard_filter_pre_file_copy(moduleOperations* module, rdpContext* context,
+                                           void* param)
 {
-	proxyFileCopyEventInfo* ev = (proxyFileCopyEventInfo*)param;
+	proxyPreFileCopyEventInfo* ev = (proxyPreFileCopyEventInfo*)param;
 	// winpr_HexDump(TAG, WLOG_INFO, ev->data, ev->data_len);
 
 	/* do not allow sending files over 5MB */
-	printf("filter: got data len=%d\n", ev->data_len);
-	if (ev->data_len >= 5 * 1024 * 1024)
+	printf("filter: got data len=%d\n", ev->total_size);
+	if (ev->total_size >= 5 * 1024 * 1024)
 		return FALSE;
 
 	return TRUE;
@@ -39,7 +40,7 @@ static BOOL clipboard_filter_file_copy(moduleOperations* module, rdpContext* con
 
 BOOL module_init(moduleOperations* module)
 {
-	module->ClipboardFileCopy = clipboard_filter_file_copy;
+	module->ClipboardPreFileCopy = clipboard_filter_pre_file_copy;
 	return TRUE;
 }
 

@@ -42,6 +42,7 @@ typedef struct connection_info connectionInfo;
 typedef struct proxy_keyboard_event_info proxyKeyboardEventInfo;
 typedef struct proxy_mouse_event_info proxyMouseEventInfo;
 typedef struct proxy_file_copy_event proxyFileCopyEventInfo;
+typedef struct proxy_pre_file_copy_event proxyPreFileCopyEventInfo;
 
 /* describes a plugin: name, description and callbacks to execute. */
 typedef struct proxy_plugin
@@ -67,6 +68,7 @@ typedef struct proxy_plugin
 	proxyFilterFn ClientChannelData; /* passthrough channels data */
 	proxyFilterFn ServerChannelData; /* passthrough channels data */
 	proxyFilterFn ServerFetchTargetAddr;
+	proxyFilterFn ClipboardPreFileCopy;
 	proxyFilterFn ClipboardFileCopy;
 } proxyPlugin;
 
@@ -145,6 +147,12 @@ struct proxy_file_copy_event
 	BOOL client_to_server; /* direction */
 	BYTE* data;            /* file data */
 	UINT64 data_len;       /* file size */
+};
+
+struct proxy_pre_file_copy_event
+{
+	BOOL client_to_server;
+	UINT64 total_size;
 };
 #define WINPR_PACK_POP
 #include <winpr/pack.h>

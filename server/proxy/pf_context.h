@@ -96,8 +96,6 @@ struct p_client_context
 
 	/* clipboard */
 	pfClipboard* clipboard;
-	UINT32 last_requested_file_index;
-	UINT32 lastRequestDwFlags;
 };
 typedef struct p_client_context pClientContext;
 
