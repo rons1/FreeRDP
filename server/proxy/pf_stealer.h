@@ -37,7 +37,6 @@ struct file_stream
 	ULARGE_INTEGER m_lSize;
 	ULARGE_INTEGER m_lOffset;
 
-	BOOL received_file_size;
 	BYTE* data;
 	UINT64 bytes_sent;
 	BOOL passed_filter;

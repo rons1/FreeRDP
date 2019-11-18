@@ -34,6 +34,7 @@ enum _PF_FILTER_TYPE
 {
 	FILTER_TYPE_KEYBOARD,
 	FILTER_TYPE_MOUSE,
+	FILTER_TYPE_PRE_FILE_COPY,
 	FILTER_TYPE_FILE_COPY
 };
 
@@ -61,6 +62,7 @@ BOOL pf_modules_register_new(const char* module_path, const char* module_name);
 BOOL pf_modules_run_filter(PF_FILTER_TYPE type, rdpContext* server, void* param);
 BOOL pf_modules_run_hook(PF_HOOK_TYPE type, rdpContext* context);
 
+BOOL pf_modules_is_filter_registered(PF_FILTER_TYPE type);
 void pf_modules_free(void);
 
 #endif /* FREERDP_SERVER_PROXY_MODULES_H */

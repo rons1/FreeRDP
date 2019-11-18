@@ -180,6 +180,7 @@ static BOOL pf_config_load_clipboard(wIniFile* ini, proxyConfig* config)
 	if (!pf_config_get_uint32(ini, "Clipboard", "MaxTextLength", &config->MaxTextLength))
 		return FALSE;
 
+	config->BufferFileData = pf_modules_is_filter_registered(FILTER_TYPE_FILE_COPY);
 	return TRUE;
 }
 
@@ -260,6 +261,10 @@ BOOL pf_server_config_load(const char* path, proxyConfig* config)
 		goto out;
 	}
 
+	/* first, load all modules because other configuration may be dependent on them */
+	if (!pf_config_load_modules(ini, config))
+		goto out;
+
 	if (!pf_config_load_server(ini, config))
 		goto out;
 
@@ -273,9 +278,6 @@ BOOL pf_server_config_load(const char* path, proxyConfig* config)
 		goto out;
 
 	if (!pf_config_load_security(ini, config))
-		goto out;
-
-	if (!pf_config_load_modules(ini, config))
 		goto out;
 
 	if (!pf_config_load_clipboard(ini, config))
@@ -329,6 +331,7 @@ void pf_server_config_print(proxyConfig* config)
 	if (config->Clipboard)
 	{
 		CONFIG_PRINT_BOOL(config, TextOnly);
+		CONFIG_PRINT_BOOL(config, BufferFileData);
 		if (config->MaxTextLength > 0)
 			CONFIG_PRINT_UINT32(config, MaxTextLength);
 	}

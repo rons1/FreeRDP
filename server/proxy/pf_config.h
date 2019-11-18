@@ -60,6 +60,7 @@ struct proxy_config
 	/* clipboard specific settings */
 	BOOL TextOnly;
 	UINT32 MaxTextLength;
+	BOOL BufferFileData;
 
 	/* session capture */
 	BOOL SessionCapture;
