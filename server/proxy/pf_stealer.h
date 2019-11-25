@@ -51,8 +51,11 @@ struct pf_clipboard
 	UINT32 nstreams;
 	fileStream* streams;
 
-	UINT32 last_requested_file_index;
-	UINT32 lastRequestDwFlags;
+	UINT32 requestedFileIndex;
+	UINT32 requestedDwFlags;
+	UINT32 clipDataId;
+	UINT32 streamId;
+	BOOL haveClipDataId;
 	HANDLE req_fevent;
 };
 

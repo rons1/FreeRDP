@@ -26,6 +26,7 @@
 
 BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count)
 {
+	// TODO only create streams for real files (not dirs)
 	void* tmp;
 
 	if (clipboard->descriptors)
@@ -64,6 +65,8 @@ pfClipboard* pf_stealer_new(CliprdrServerContext* server, CliprdrClientContext* 
 	pfc = (pfClipboard*)calloc(1, sizeof(pfClipboard));
 	if (!pfc)
 		return NULL;
+
+	pfc->req_fevent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	pfc->server = server;
 	pfc->client = client;

@@ -195,10 +195,6 @@ wStream* cliprdr_packet_format_list_new(const CLIPRDR_FORMAT_LIST* formatList,
 	CLIPRDR_FORMAT* format;
 	UINT32 length;
 
-	if (formatList->msgType != CB_FORMAT_LIST)
-		WLog_WARN(TAG, "[%s] called with invalid type %08" PRIx32, __FUNCTION__,
-		          formatList->msgType);
-
 	if (!useLongFormatNames)
 	{
 		length = formatList->numFormats * 36;
