@@ -382,6 +382,7 @@ static UINT pf_rdpgfx_caps_confirm(RdpgfxClientContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	RdpgfxServerContext* server = (RdpgfxServerContext*)pdata->ps->gfx;
 	WLog_VRB(TAG, __FUNCTION__);
+	printf("caps selected: 0x%x\n", capsConfirm->capsSet->version);
 	return server->CapsConfirm(server, capsConfirm);
 }
 
@@ -409,6 +410,7 @@ static UINT pf_rdpgfx_caps_advertise(RdpgfxServerContext* context,
 		{
 			proxySupportedCapsSet = &proxySupportedCapsSets[proxySupportedCapsSetCount++];
 			proxySupportedCapsSet->version = currentCaps->version;
+			printf("client supports 0x%x\n", currentCaps->version);
 			proxySupportedCapsSet->length = currentCaps->length;
 			proxySupportedCapsSet->flags = currentCaps->flags;
 		}

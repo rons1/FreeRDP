@@ -32,7 +32,7 @@ static BOOL clipboard_filter_pre_file_copy(moduleOperations* module, rdpContext*
 
 	/* do not allow sending files over 5MB */
 	printf("filter: got data len=%d\n", ev->total_size);
-	if (ev->total_size >= 5 * 1024 * 1024)
+	if (ev->total_size >= 1 * 1024 * 1024)
 		return FALSE;
 
 	return TRUE;
