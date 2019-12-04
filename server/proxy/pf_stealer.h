@@ -21,46 +21,66 @@
 #ifndef FREERDP_SERVER_PROXY_STEALER_H
 #define FREERDP_SERVER_PROXY_STEALER_H
 
-#include <winpr/shell.h>
 #include <winpr/wtypes.h>
 #include <winpr/collections.h>
 
 #include <freerdp/server/cliprdr.h>
 #include <freerdp/client/cliprdr.h>
 
+typedef enum clipboard_owner CLIPBOARD_OWNER;
+enum clipboard_owner
+{
+	CLIPBOARD_OWNER_CLIENT,
+	CLIPBOARD_OWNER_SERVER
+};
+
 typedef struct file_stream fileStream;
 typedef struct pf_clipboard pfClipboard;
 
 struct file_stream
 {
-	ULONG m_lIndex;
 	ULARGE_INTEGER m_lSize;
 	ULARGE_INTEGER m_lOffset;
 
-	BYTE* data;
-	UINT64 bytes_sent;
+	wStream* data;
 	BOOL passed_filter;
 };
 
 struct pf_clipboard
 {
+	CLIPBOARD_OWNER owner;
+
 	CliprdrServerContext* server;
 	CliprdrClientContext* client;
-	FILEDESCRIPTOR* descriptors;
 
 	UINT32 nstreams;
+	FILEDESCRIPTOR* descriptors;
 	fileStream* streams;
 
+	UINT32 fileListFormatId;
 	UINT32 requestedFileIndex;
 	UINT32 requestedDwFlags;
 	UINT32 clipDataId;
-	UINT32 streamId;
+	UINT32 requestedFormatId;
 	BOOL haveClipDataId;
-	HANDLE req_fevent;
 };
 
-BOOL pf_stealer_write_file(pfClipboard* clipboard, UINT32 listIndex, const BYTE* data, UINT32 len);
-BOOL pf_stealer_set_files(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors, UINT count);
-pfClipboard* pf_stealer_new(CliprdrServerContext* server, CliprdrClientContext* client);
-void pf_stealer_free(pfClipboard* clipboard);
+fileStream* pf_clipboard_get_current_stream(pfClipboard* clipboard);
+fileStream* pf_clipboard_get_stream(pfClipboard* clipboard, UINT32 index);
+
+void pf_clipboard_state_update_request_info(pfClipboard* clipboard,
+                                            const CLIPRDR_FILE_CONTENTS_REQUEST* request);
+void pf_clipboard_state_update_format_list(pfClipboard* clipboard, const CLIPRDR_FORMAT_LIST* list);
+
+BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* array, UINT count);
+BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
+                                         const CLIPRDR_FILE_CONTENTS_RESPONSE* response);
+
+BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard);
+BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQUEST* request,
+                             UINT64* actual_size, BOOL* last_chunk);
+
+pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientContext* client,
+                                    CLIPBOARD_OWNER owner);
+void pf_clipboard_state_free(pfClipboard* clipboard);
 #endif

@@ -18,35 +18,41 @@
  */
 
 #include <stdio.h>
+#include <winpr/print.h>
 
 #include "modules_api.h"
 #include "pf_log.h"
 
-#define TAG PROXY_TAG("modules.clipboard")
+#define TAG MODULE_TAG("clipboard_filter")
 
-static BOOL clipboard_filter_pre_file_copy(moduleOperations* module, rdpContext* context,
-                                           void* param)
+static BOOL clipboard_file_metadata_received(moduleOperations* module, rdpContext* context,
+                                             void* param)
 {
 	proxyPreFileCopyEventInfo* ev = (proxyPreFileCopyEventInfo*)param;
-	// winpr_HexDump(TAG, WLOG_INFO, ev->data, ev->data_len);
 
 	/* do not allow sending files over 5MB */
-	printf("filter: got data len=%d\n", ev->total_size);
-	if (ev->total_size >= 1 * 1024 * 1024)
+	WLog_INFO(TAG, "filter: got data len=%ld", ev->total_size);
+	if (ev->total_size >= 5 * 1024 * 1024)
 		return FALSE;
 
 	return TRUE;
 }
 
+static BOOL clipboard_file_data_received(moduleOperations* module, rdpContext* context, void* param)
+{
+	proxyFileCopyEventInfo* ev = (proxyFileCopyEventInfo*)param;
+	winpr_HexDump(TAG, WLOG_DEBUG, ev->data, ev->data_len);
+	return TRUE;
+}
+
 BOOL module_init(moduleOperations* module)
 {
-	module->ClipboardPreFileCopy = clipboard_filter_pre_file_copy;
+	module->ClipboardFileMetadata = clipboard_file_metadata_received;
+	module->ClipboardFileData = clipboard_file_data_received;
 	return TRUE;
 }
 
 BOOL module_exit(moduleOperations* module)
 {
-	printf("bye bye\n");
-
 	return TRUE;
 }

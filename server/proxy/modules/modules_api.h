@@ -25,6 +25,7 @@
 #include <winpr/winpr.h>
 
 #define PROXY_API FREERDP_API
+#define MODULE_TAG(tag) "proxy.modules." tag
 
 typedef struct module_operations moduleOperations;
 
@@ -51,11 +52,10 @@ typedef void* (*moduleGetSessionData)(moduleOperations*, rdpContext*);
  */
 typedef void (*moduleAbortConnect)(moduleOperations*, rdpContext*);
 
-typedef struct connection_info connectionInfo;
-typedef struct proxy_keyboard_event_info proxyKeyboardEventInfo;
-typedef struct proxy_mouse_event_info proxyMouseEventInfo;
-typedef struct proxy_file_copy_event proxyFileCopyEventInfo;
-typedef struct proxy_pre_file_copy_event proxyPreFileCopyEventInfo;
+typedef struct kbd_event proxyKeyboardEventInfo;
+typedef struct mouse_event proxyMouseEventInfo;
+typedef struct file_metadata_event proxyPreFileCopyEventInfo;
+typedef struct file_data_event proxyFileCopyEventInfo;
 
 /* represents a set of operations that a module can do */
 struct module_operations
@@ -73,34 +73,36 @@ struct module_operations
 	/* proxy filters a module can set these function pointers to register filters. */
 	proxyFilterFn KeyboardEvent;
 	proxyFilterFn MouseEvent;
-	proxyFilterFn ClipboardFileCopy;
-	proxyFilterFn ClipboardPreFileCopy;
+
+	/* cliprdr related filters */
+	proxyFilterFn ClipboardFileMetadata;
+	proxyFilterFn ClipboardFileData;
 };
 
 /* filter events parameters */
 #define WINPR_PACK_PUSH
 #include <winpr/pack.h>
-struct proxy_keyboard_event_info
+struct kbd_event
 {
 	UINT16 flags;
 	UINT16 rdp_scan_code;
 };
 
-struct proxy_mouse_event_info
+struct mouse_event
 {
 	UINT16 flags;
 	UINT16 x;
 	UINT16 y;
 };
 
-struct proxy_file_copy_event
+struct file_data_event
 {
 	BOOL client_to_server; /* direction */
 	BYTE* data;            /* file data */
 	UINT64 data_len;       /* file size */
 };
 
-struct proxy_pre_file_copy_event
+struct file_metadata_event
 {
 	BOOL client_to_server;
 	UINT64 total_size;

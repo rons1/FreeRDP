@@ -40,7 +40,7 @@ typedef BOOL (*moduleInitFn)(moduleOperations* ops);
 typedef BOOL (*moduleExitFn)(moduleOperations* ops);
 
 static const char* FILTER_TYPE_STRINGS[] = { "KEYBOARD_EVENT", "MOUSE_EVENT",
-	                                         "CLIPBOARD_FILE_COPY" };
+	                                         "CLIPBOARD_FILE_METADATA", "CLIPBOARD_FILE_DATA" };
 
 static const char* HOOK_TYPE_STRINGS[] = {
 	"CLIENT_PRE_CONNECT",
@@ -50,7 +50,7 @@ static const char* HOOK_TYPE_STRINGS[] = {
 
 static const char* pf_modules_get_filter_type_string(PF_FILTER_TYPE result)
 {
-	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_FILE_COPY)
+	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_CLIPBOARD_FILE_DATA)
 		return FILTER_TYPE_STRINGS[result];
 	else
 		return "FILTER_UNKNOWN";
@@ -155,12 +155,12 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, rdpContext* server, void* param)
 				IFCALLRET(ops->MouseEvent, result, ops, server, param);
 				break;
 
-			case FILTER_TYPE_FILE_COPY:
-				IFCALLRET(ops->ClipboardFileCopy, result, ops, server, param);
+			case FILTER_TYPE_CLIPBOARD_FILE_METADATA:
+				IFCALLRET(ops->ClipboardFileMetadata, result, ops, server, param);
 				break;
 
-			case FILTER_TYPE_PRE_FILE_COPY:
-				IFCALLRET(ops->ClipboardPreFileCopy, result, ops, server, param);
+			case FILTER_TYPE_CLIPBOARD_FILE_DATA:
+				IFCALLRET(ops->ClipboardFileData, result, ops, server, param);
 				break;
 		}
 
@@ -369,12 +369,12 @@ BOOL pf_modules_is_filter_registered(PF_FILTER_TYPE type)
 
 		switch (type)
 		{
-			case FILTER_TYPE_PRE_FILE_COPY:
-				if (module->ops->ClipboardPreFileCopy)
+			case FILTER_TYPE_CLIPBOARD_FILE_METADATA:
+				if (module->ops->ClipboardFileMetadata)
 					return TRUE;
 				break;
-			case FILTER_TYPE_FILE_COPY:
-				if (module->ops->ClipboardFileCopy)
+			case FILTER_TYPE_CLIPBOARD_FILE_DATA:
+				if (module->ops->ClipboardFileData)
 					return TRUE;
 				break;
 			case FILTER_TYPE_KEYBOARD:

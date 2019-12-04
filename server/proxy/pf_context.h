@@ -57,6 +57,9 @@ struct p_server_context
 
 	/* used to external modules to store per-session info */
 	wHashTable* modules_info;
+
+	/* used to manage clipboard state */
+	pfClipboard* clipboard;
 };
 typedef struct p_server_context pServerContext;
 
@@ -90,7 +93,7 @@ struct p_client_context
 	char* frames_dir;
 	UINT64 frames_count;
 
-	/* clipboard */
+	/* used to manage clipboard state */
 	pfClipboard* clipboard;
 };
 typedef struct p_client_context pClientContext;
