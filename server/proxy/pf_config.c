@@ -215,7 +215,7 @@ static BOOL pf_config_load_clipboard(wIniFile* ini, proxyConfig* config)
 	if (!pf_config_get_uint32(ini, "Clipboard", "MaxTextLength", &config->MaxTextLength))
 		return FALSE;
 
-	config->BufferFileData = pf_modules_is_filter_registered(FILTER_TYPE_FILE_COPY);
+	config->BufferFileData = pf_modules_is_filter_registered(FILTER_TYPE_CLIPBOARD_FILE_DATA);
 	return TRUE;
 }
 

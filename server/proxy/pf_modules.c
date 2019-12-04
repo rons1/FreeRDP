@@ -39,8 +39,13 @@ static wArrayList* handles_list = NULL; /* list of module handles to free at shu
 
 typedef BOOL (*moduleEntryPoint)(proxyPluginsManager* plugins_manager);
 
+<<<<<<< HEAD
 static const char* FILTER_TYPE_STRINGS[] = { "KEYBOARD_EVENT", "MOUSE_EVENT", "CLIENT_CHANNEL_DATA",
 	                                         "SERVER_CHANNEL_DATA", "SERVER_FETCH_TARGET_ADDR", "CLIPBOARD_FILE_COPY" };
+=======
+static const char* FILTER_TYPE_STRINGS[] = { "KEYBOARD_EVENT", "MOUSE_EVENT",
+	                                         "CLIPBOARD_FILE_METADATA", "CLIPBOARD_FILE_DATA" };
+>>>>>>> shit wip
 
 static const char* HOOK_TYPE_STRINGS[] = {
 	"CLIENT_PRE_CONNECT",  "CLIENT_POST_CONNECT",  "CLIENT_LOGIN_FAILURE", "CLIENT_END_PAINT",
@@ -49,7 +54,11 @@ static const char* HOOK_TYPE_STRINGS[] = {
 
 static const char* pf_modules_get_filter_type_string(PF_FILTER_TYPE result)
 {
+<<<<<<< HEAD
 	if (result >= FILTER_TYPE_KEYBOARD && result < FILTER_LAST)
+=======
+	if (result >= FILTER_TYPE_KEYBOARD && result <= FILTER_TYPE_CLIPBOARD_FILE_DATA)
+>>>>>>> shit wip
 		return FILTER_TYPE_STRINGS[result];
 	else
 		return "FILTER_UNKNOWN";
@@ -167,18 +176,23 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 				IFCALLRET(plugin->ServerFetchTargetAddr, result, pdata, param);
 				break;
 
+<<<<<<< HEAD
 			default:
 				WLog_ERR(TAG, "invalid filter called");
 =======
 			case FILTER_TYPE_FILE_COPY:
 				IFCALLRET(ops->ClipboardFileCopy, result, ops, server, param);
+=======
+			case FILTER_TYPE_CLIPBOARD_FILE_METADATA:
+				IFCALLRET(ops->ClipboardFileMetadata, result, ops, server, param);
+>>>>>>> shit wip
 				break;
 <<<<<<< HEAD
 >>>>>>> wip3
 =======
 
-			case FILTER_TYPE_PRE_FILE_COPY:
-				IFCALLRET(ops->ClipboardPreFileCopy, result, ops, server, param);
+			case FILTER_TYPE_CLIPBOARD_FILE_DATA:
+				IFCALLRET(ops->ClipboardFileData, result, ops, server, param);
 				break;
 >>>>>>> wip4
 		}
@@ -459,12 +473,12 @@ BOOL pf_modules_is_filter_registered(PF_FILTER_TYPE type)
 
 		switch (type)
 		{
-			case FILTER_TYPE_PRE_FILE_COPY:
-				if (module->ops->ClipboardPreFileCopy)
+			case FILTER_TYPE_CLIPBOARD_FILE_METADATA:
+				if (module->ops->ClipboardFileMetadata)
 					return TRUE;
 				break;
-			case FILTER_TYPE_FILE_COPY:
-				if (module->ops->ClipboardFileCopy)
+			case FILTER_TYPE_CLIPBOARD_FILE_DATA:
+				if (module->ops->ClipboardFileData)
 					return TRUE;
 				break;
 			case FILTER_TYPE_KEYBOARD:

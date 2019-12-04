@@ -62,6 +62,11 @@ struct p_server_context
 
 	HANDLE* vc_handles; /* static virtual channels open handles */
 	wHashTable* vc_ids; /* channel_name -> channel_id map */
+	/* used to external modules to store per-session info */
+	wHashTable* modules_info;
+
+	/* used to manage clipboard state */
+	pfClipboard* clipboard;
 };
 typedef struct p_server_context pServerContext;
 
@@ -94,7 +99,7 @@ struct p_client_context
 
 	wHashTable* vc_ids; /* channel_name -> channel_id map */
 
-	/* clipboard */
+	/* used to manage clipboard state */
 	pfClipboard* clipboard;
 };
 typedef struct p_client_context pClientContext;

@@ -122,9 +122,9 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 		}
 
 		pc->cliprdr = (CliprdrClientContext*)e->pInterface;
-		ps->pdata->pc->clipboard = pf_stealer_new(ps->cliprdr, pc->cliprdr);
+		ps->pdata->pc->clipboard =
+		    pf_clipboard_state_new(ps->cliprdr, pc->cliprdr, CLIPBOARD_OWNER_CLIENT);
 
-		// todo check this shit
 		pf_cliprdr_register_callbacks(pc->cliprdr, ps->cliprdr, pc->pdata);
 	}
 	else if (strcmp(e->name, "rdpsnd") == 0)
@@ -179,7 +179,7 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 		if (ps->cliprdr->Stop(ps->cliprdr) != CHANNEL_RC_OK)
 			WLog_ERR(TAG, "failed to stop cliprdr server");
 
-		pf_stealer_free(pc->clipboard);
+		pf_clipboard_state_free(pc->clipboard);
 		pc->cliprdr = NULL;
 	}
 	else if (strcmp(e->name, "rdpsnd") == 0)
@@ -280,6 +280,7 @@ void pf_server_channels_free(pServerContext* ps)
 	if (ps->cliprdr)
 	{
 		cliprdr_server_context_free(ps->cliprdr);
+		pf_clipboard_state_free(ps->clipboard);
 		ps->cliprdr = NULL;
 	}
 
