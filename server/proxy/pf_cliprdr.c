@@ -30,6 +30,10 @@
 /* used for createing a fake format list response, containing only text formats */
 static CLIPRDR_FORMAT g_text_formats[] = { { CF_TEXT, "\0" }, { CF_UNICODETEXT, "\0" } };
 
+UINT cliprdr_send_response_filecontents(pfClipboard* clipboard, UINT32 streamId, ULONG index,
+                                        BYTE* data, ULONG n, UINT16 flags);
+UINT cliprdr_send_request_filecontents(pfClipboard* clipboard, UINT32 streamId, ULONG index,
+                                       UINT32 flag, DWORD positionhigh, DWORD positionlow, ULONG n);
 BOOL pf_server_cliprdr_init(pServerContext* ps)
 {
 	CliprdrServerContext* cliprdr;
@@ -159,6 +163,76 @@ static INLINE void clipboard_create_failed_format_data_response(CLIPRDR_FORMAT_D
 	dst->msgFlags = CB_RESPONSE_FAIL;
 }
 
+static UINT clipboard_handle_file_contents_request(proxyData* pdata, pfClipboard* clipboard,
+                                                   const CLIPRDR_FILE_CONTENTS_REQUEST* request)
+{
+	UINT rc = CHANNEL_RC_OK;
+	CliprdrServerContext* server = clipboard->server;
+	CliprdrClientContext* client = clipboard->client;
+	fileStream* current;
+	BOOL all_sent;
+	UINT32 n;
+
+	WLog_INFO(TAG, __FUNCTION__);
+
+	if (!pdata->config->BufferFileData)
+	{
+		if (clipboard->owner == CLIPBOARD_OWNER_SERVER)
+			return server->ServerFileContentsRequest(server, request);
+		else
+			return client->ClientFileContentsRequest(client, request);
+	}
+
+	pf_clipboard_state_update_request_info(clipboard, request);
+
+	if (pdata->config->TextOnly)
+		return CHANNEL_RC_OK;
+
+	if (request->dwFlags == FILECONTENTS_SIZE)
+	{
+		clipboard->requestedDwFlags = FILECONTENTS_SIZE;
+		if (clipboard->owner == CLIPBOARD_OWNER_SERVER)
+			return server->ServerFileContentsRequest(server, request);
+		else
+			return client->ClientFileContentsRequest(client, request);
+	}
+
+	current = pf_clipboard_get_stream(clipboard, request->listIndex);
+	if (!current)
+		return ERROR_INTERNAL_ERROR;
+
+	if (current->passed_filter == FALSE)
+	{
+		pf_clipboard_stream_free(clipboard, request->listIndex);
+
+		/* file did not pass filter */
+		return cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
+		                                          NULL, 0, CB_RESPONSE_FAIL);
+	}
+
+	if (n == 0)
+		return cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
+		                                          NULL, 0, CB_RESPONSE_OK);
+
+	BYTE* chunk_data = pf_clipboard_get_chunk(current, request, &n, &all_sent);
+
+	WLog_INFO(TAG, "remote server requested max %" PRIu32 " bytes", request->cbRequested);
+	WLog_INFO(TAG, "sending %" PRIu64 " bytes to remote server", n);
+
+	rc = cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
+	                                        chunk_data, n, CB_RESPONSE_OK);
+
+	if (all_sent)
+	{
+		WLog_INFO(TAG, "finished sending file to remote server: index=%" PRIu16 "",
+		          request->listIndex);
+
+		pf_clipboard_stream_free(clipboard, request->listIndex);
+	}
+
+	return rc;
+}
+
 /* server callbacks */
 static UINT clipboard_ClientCapabilities(CliprdrServerContext* context,
                                          const CLIPRDR_CAPABILITIES* capabilities)
@@ -214,6 +288,8 @@ static UINT clipboard_ClientLockClipboardData(CliprdrServerContext* context,
 	proxyData* pdata = (proxyData*)context->custom;
 	CliprdrClientContext* client = pdata->pc->cliprdr;
 	WLog_INFO(TAG, __FUNCTION__);
+	pdata->ps->clipboard->clipDataId = lock->clipDataId;
+	pdata->ps->clipboard->haveClipDataId = TRUE;
 	return client->ClientLockClipboardData(client, lock);
 }
 
@@ -278,19 +354,19 @@ static UINT clipboard_ClientFileContentsRequest(CliprdrServerContext* context,
                                                 const CLIPRDR_FILE_CONTENTS_REQUEST* request)
 {
 	proxyData* pdata = (proxyData*)context->custom;
-	CliprdrClientContext* client = pdata->pc->cliprdr;
+	pfClipboard* clipboard = pdata->pc->clipboard;
+
 	WLog_INFO(TAG, __FUNCTION__);
+	printf("got file contents request from target server\n");
 
-	if (pdata->config->TextOnly)
-		return CHANNEL_RC_OK;
-
-	return client->ClientFileContentsRequest(client, request);
+	/* server file contents request using client's clipboard state */
+	return clipboard_handle_file_contents_request(pdata, clipboard, request);
 }
 
 UINT cliprdr_send_request_filecontents(pfClipboard* clipboard, UINT32 streamId, ULONG index,
                                        UINT32 flag, DWORD positionhigh, DWORD positionlow, ULONG n)
 {
-	CLIPRDR_FILE_CONTENTS_REQUEST fileContentsRequest = { 0 };
+	CLIPRDR_FILE_CONTENTS_REQUEST request = { 0 };
 
 	if (!clipboard || !clipboard->server || !clipboard->server->ClientFileContentsRequest)
 		return ERROR_INTERNAL_ERROR;
@@ -298,17 +374,21 @@ UINT cliprdr_send_request_filecontents(pfClipboard* clipboard, UINT32 streamId, 
 	// TODO: encapsulate
 	clipboard->requestedDwFlags = flag;
 
-	fileContentsRequest.streamId = streamId;
-	fileContentsRequest.listIndex = index;
-	fileContentsRequest.dwFlags = flag;
-	fileContentsRequest.nPositionLow = positionlow;
-	fileContentsRequest.nPositionHigh = positionhigh;
-	fileContentsRequest.cbRequested = n;
-	fileContentsRequest.clipDataId = clipboard->clipDataId;
-	fileContentsRequest.haveClipDataId = clipboard->haveClipDataId;
-	fileContentsRequest.msgFlags = 0;
-	fileContentsRequest.msgType = CB_FILECONTENTS_REQUEST;
-	return clipboard->server->ServerFileContentsRequest(clipboard->server, &fileContentsRequest);
+	request.streamId = streamId;
+	request.listIndex = index;
+	request.dwFlags = flag;
+	request.nPositionLow = positionlow;
+	request.nPositionHigh = positionhigh;
+	request.cbRequested = n;
+	request.clipDataId = clipboard->clipDataId;
+	request.haveClipDataId = clipboard->haveClipDataId;
+	request.msgFlags = 0;
+	request.msgType = CB_FILECONTENTS_REQUEST;
+
+	if (clipboard->owner == CLIPBOARD_OWNER_SERVER)
+		return clipboard->server->ServerFileContentsRequest(clipboard->server, &request);
+	else
+		return clipboard->client->ClientFileContentsRequest(clipboard->client, &request);
 }
 
 UINT cliprdr_send_response_filecontents(pfClipboard* clipboard, UINT32 streamId, ULONG index,
@@ -350,13 +430,6 @@ static UINT clipboard_handle_filecontents_size_response_from_peer(
 		return cliprdr_send_response_filecontents(clipboard, response->streamId, index,
 		                                          (BYTE*)&stream->m_lSize.QuadPart, 8,
 		                                          CB_RESPONSE_OK);
-
-	stream->data = Stream_New(NULL, stream->m_lSize.QuadPart);
-	if (!stream->data)
-	{
-		WLog_ERR(TAG, "failed to allocate memory for file");
-		return ERROR_NOT_ENOUGH_MEMORY;
-	}
 
 	event.client_to_server = TRUE;
 	event.total_size = stream->m_lSize.QuadPart;
@@ -550,10 +623,8 @@ static UINT clipboard_ServerFormatDataResponse(CliprdrClientContext* context,
 	}
 	else if (clipboard_is_text_format(server->lastRequestedFormatId))
 	{
-		printf("here22\n");
 		if (!clipboard_is_copy_paste_valid(pdata->config, response, server->lastRequestedFormatId))
 		{
-			printf("copy is not valid, returning fail to peer\n");
 			CLIPRDR_FORMAT_DATA_RESPONSE resp;
 			clipboard_create_failed_format_data_response(&resp);
 			return server->ServerFormatDataResponse(server, &resp);
@@ -566,82 +637,44 @@ static UINT clipboard_ServerFormatDataResponse(CliprdrClientContext* context,
 static UINT clipboard_ServerFileContentsRequest(CliprdrClientContext* context,
                                                 const CLIPRDR_FILE_CONTENTS_REQUEST* request)
 {
-	UINT rc = CHANNEL_RC_OK;
 	proxyData* pdata = (proxyData*)context->custom;
-	CliprdrServerContext* server = pdata->ps->cliprdr;
 	pfClipboard* clipboard = pdata->ps->clipboard;
-	fileStream* current;
-	UINT64 n;
 
 	WLog_INFO(TAG, __FUNCTION__);
 
-	if (!pdata->config->BufferFileData)
-		return server->ServerFileContentsRequest(server, request);
-
-	pf_clipboard_state_update_request_info(clipboard, request);
-
-	if (pdata->config->TextOnly)
-		return CHANNEL_RC_OK;
-
-	if (request->dwFlags == FILECONTENTS_SIZE)
-	{
-		pdata->ps->clipboard->requestedDwFlags = FILECONTENTS_SIZE;
-		return server->ServerFileContentsRequest(server, request);
-	}
-
-	/* get file data from server's clipboard state */
-	current = pf_clipboard_get_stream(clipboard, request->listIndex);
-	if (!current)
-		return ERROR_INTERNAL_ERROR;
-
-	if (current->passed_filter == FALSE)
-	{
-		/* free data */
-		free(current->data);
-		current->data = NULL;
-
-		/* file did not pass filter */
-		return cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
-		                                          NULL, 0, CB_RESPONSE_FAIL);
-	}
-
-	n = request->cbRequested;
-	BOOL all_sent;
-	if (n == 0)
-		return cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
-		                                          NULL, 0, CB_RESPONSE_OK);
-
-	BYTE* chunk_data = pf_clipboard_get_chunk(current, request, &n, &all_sent);
-
-	WLog_INFO(TAG, "remote server requested max %" PRIu32 " bytes", request->cbRequested);
-	WLog_INFO(TAG, "sending %" PRIu64 " bytes to remote server", n);
-
-	rc = cliprdr_send_response_filecontents(clipboard, request->streamId, request->listIndex,
-	                                        chunk_data, n, CB_RESPONSE_OK);
-
-	if (all_sent)
-	{
-		WLog_INFO(TAG, "finished sending file to remote server: index=%" PRIu16 "",
-		          request->listIndex);
-
-		free(current->data);
-		current->data = NULL;
-	}
-
-	return rc;
+	/* server file contents request using server's clipboard state */
+	return clipboard_handle_file_contents_request(pdata, clipboard, request);
 }
 
 static UINT clipboard_ServerFileContentsResponse(CliprdrClientContext* context,
                                                  const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
 	proxyData* pdata = (proxyData*)context->custom;
-	CliprdrServerContext* server = pdata->ps->cliprdr;
+	pfClipboard* clipboard = pdata->pc->clipboard;
 	WLog_INFO(TAG, __FUNCTION__);
 
+	if (!pdata->config->BufferFileData)
+	{
+		CliprdrServerContext* server = pdata->ps->cliprdr;
+		return server->ServerFileContentsResponse(server, response);
+	}
+
+	if (response->msgFlags == CB_RESPONSE_FAIL)
+		return ERROR_INTERNAL_ERROR;
+
+	/* if TextOnly is set to TRUE, ignore any file contents response PDUs. */
 	if (pdata->config->TextOnly)
 		return CHANNEL_RC_OK;
 
-	return server->ServerFileContentsResponse(server, response);
+	switch (clipboard->requestedDwFlags)
+	{
+		case FILECONTENTS_SIZE:
+			return clipboard_handle_filecontents_size_response_from_peer(clipboard, response);
+		case FILECONTENTS_RANGE:
+			return clipboard_handle_filecontents_range_response_from_peer(clipboard, response);
+		default:
+			return ERROR_BAD_ARGUMENTS;
+	}
 }
 
 void pf_cliprdr_register_callbacks(CliprdrClientContext* cliprdr_client,
