@@ -67,6 +67,7 @@ struct pf_clipboard
 
 fileStream* pf_clipboard_get_current_stream(pfClipboard* clipboard);
 fileStream* pf_clipboard_get_stream(pfClipboard* clipboard, UINT32 index);
+void pf_clipboard_stream_free(pfClipboard* clipboard, UINT32 listIndex);
 
 void pf_clipboard_state_update_request_info(pfClipboard* clipboard,
                                             const CLIPRDR_FILE_CONTENTS_REQUEST* request);
@@ -78,7 +79,7 @@ BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
 
 BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard);
 BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQUEST* request,
-                             UINT64* actual_size, BOOL* last_chunk);
+                             UINT32* actual_size, BOOL* last_chunk);
 
 pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientContext* client,
                                     CLIPBOARD_OWNER owner);

@@ -32,7 +32,7 @@ static BOOL clipboard_file_metadata_received(moduleOperations* module, rdpContex
 
 	/* do not allow sending files over 5MB */
 	WLog_INFO(TAG, "filter: got data len=%ld", ev->total_size);
-	if (ev->total_size >= 5 * 1024 * 1024)
+	if (ev->total_size >= 15 * 1024 * 1024)
 		return FALSE;
 
 	return TRUE;

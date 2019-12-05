@@ -1,6 +1,6 @@
 /**
  * FreeRDP: A Remote Desktop Protocol Implementation
- * FreeRDP Clipboard Files Stealer
+ * FreeRDP Proxy Clipboard State
  *
  * Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
  *
@@ -20,11 +20,11 @@
 #include <winpr/wtypes.h>
 #include <winpr/file.h>
 #include <winpr/collections.h>
-#include <freerdp/log.h>
 
+#include "pf_log.h"
 #include "pf_stealer.h"
 
-#define TAG PROXY_TAG("clipboard.state")
+#define TAG PROXY_TAG("clipboard.common")
 
 BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors,
                                          UINT count)
@@ -59,7 +59,7 @@ BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR*
 	clipboard->streams = tmp;
 	ZeroMemory(clipboard->streams, clipboard->nstreams * sizeof(fileStream));
 
-	/* initialize sizes for streams */
+	/* initialize streams */
 	for (i = 0; i < clipboard->nstreams; i++)
 	{
 		FILEDESCRIPTOR file = clipboard->descriptors[i];
@@ -67,6 +67,13 @@ BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR*
 
 		stream->m_lSize.LowPart = file.nFileSizeLow;
 		stream->m_lSize.HighPart = file.nFileSizeHigh;
+		stream->data = Stream_New(NULL, stream->m_lSize.QuadPart);
+
+		if (!stream->data)
+		{
+			WLog_ERR(TAG, "failed to allocate memory for file data");
+			return FALSE;
+		}
 	}
 
 	return TRUE;
@@ -91,8 +98,9 @@ fileStream* pf_clipboard_get_stream(pfClipboard* clipboard, UINT32 index)
 void pf_clipboard_state_update_format_list(pfClipboard* clipboard,
                                            const CLIPRDR_FORMAT_LIST* formatList)
 {
-	size_t i = 0;
-	for (; i < formatList->numFormats; i++)
+	size_t i;
+
+	for (i = 0; i < formatList->numFormats; i++)
 	{
 		if (NULL == formatList->formats[i].formatName)
 			continue;
@@ -100,7 +108,7 @@ void pf_clipboard_state_update_format_list(pfClipboard* clipboard,
 		if (strcmp("FileGroupDescriptorW", formatList->formats[i].formatName) == 0)
 		{
 			clipboard->fileListFormatId = formatList->formats[i].formatId;
-			printf("file list format id: 0%x\n", clipboard->fileListFormatId);
+			WLog_DBG(TAG, "file list format id: 0x%x", clipboard->fileListFormatId);
 			return;
 		}
 	}
@@ -126,15 +134,14 @@ BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
 
 	if (!stream)
 	{
-		printf("missing file stream\n");
+		WLog_ERR(TAG, "file list is invalid");
 		return FALSE;
 	}
 
-	if (Stream_GetRemainingLength(stream->data) < response->cbRequested)
+	if (response->cbRequested > Stream_GetRemainingLength(stream->data))
 	{
-		printf("received more file data than expected\n");
-		free(stream->data);
-		stream->data = NULL;
+		WLog_ERR(TAG, "received more file data than expected");
+		// TODO: free this stream
 		return FALSE;
 	}
 
@@ -148,8 +155,6 @@ BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
 
 BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard)
 {
-	printf("file list format id: %d, requested format id: %d\n", clipboard->fileListFormatId,
-	       clipboard->requestedFormatId);
 	return clipboard->fileListFormatId == clipboard->requestedFormatId;
 }
 
@@ -170,26 +175,45 @@ pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientC
 }
 
 BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQUEST* request,
-                             UINT64* actual_size, BOOL* last_chunk)
+                             UINT32* actual_size, BOOL* last_chunk)
 {
 	UINT64 file_size = stream->m_lSize.QuadPart;
-	UINT64 nreq = request->cbRequested;
-	UINT64 actual_chunk_size;
-
+	UINT32 nreq = request->cbRequested;
+	UINT32 actual_chunk_size;
 	ULARGE_INTEGER requested_offset;
+
 	requested_offset.LowPart = request->nPositionLow;
 	requested_offset.HighPart = request->nPositionHigh;
 
-	if (nreq > file_size)
-		actual_chunk_size = file_size;
-	else if (requested_offset.QuadPart + nreq > file_size) /* send only what's left */
+	/* invalid offset */
+	if (requested_offset.QuadPart >= file_size)
+		return NULL;
+
+	Stream_SetPosition(stream->data, requested_offset.QuadPart);
+
+	/*
+	 * if the number of requested bytes is bigger than the size of the remaiming data, the chunk
+	 * size should be the size of the remamiming data.
+	 */
+
+	actual_chunk_size = nreq;
+	if (nreq >= Stream_GetRemainingLength(stream->data)) /* send only what's left */
 		actual_chunk_size = file_size - requested_offset.QuadPart;
 
 	*actual_size = actual_chunk_size;
 	*last_chunk = (requested_offset.QuadPart + actual_chunk_size == file_size);
 
-	Stream_SetPosition(stream->data, requested_offset.QuadPart);
 	return Stream_Pointer(stream->data);
+}
+
+void pf_clipboard_stream_free(pfClipboard* clipboard, UINT32 listIndex)
+{
+	fileStream* stream = pf_clipboard_get_stream(clipboard, listIndex);
+	if (!stream)
+		return;
+
+	Stream_Free(stream->data, TRUE);
+	stream->data = NULL;
 }
 
 void pf_clipboard_state_free(pfClipboard* clipboard)
@@ -202,7 +226,7 @@ void pf_clipboard_state_free(pfClipboard* clipboard)
 	for (i = 0; i < clipboard->nstreams; i++)
 	{
 		if (clipboard->streams[i].data)
-			free(clipboard->streams[i].data);
+			Stream_Free(clipboard->streams[i].data, TRUE);
 	}
 
 	free(clipboard->streams);
