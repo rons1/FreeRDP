@@ -28,6 +28,7 @@
 static BOOL clipboard_file_metadata_received(moduleOperations* module, rdpContext* context,
                                              void* param)
 {
+	return TRUE;
 	proxyPreFileCopyEventInfo* ev = (proxyPreFileCopyEventInfo*)param;
 
 	/* do not allow sending files over 5MB */
@@ -41,7 +42,17 @@ static BOOL clipboard_file_metadata_received(moduleOperations* module, rdpContex
 static BOOL clipboard_file_data_received(moduleOperations* module, rdpContext* context, void* param)
 {
 	proxyFileCopyEventInfo* ev = (proxyFileCopyEventInfo*)param;
-	winpr_HexDump(TAG, WLOG_DEBUG, ev->data, ev->data_len);
+	printf("module got file: client to server=%d\n", ev->client_to_server);
+	/* dump file data to file */
+	HANDLE file;
+	file =
+	    CreateFileA("test.txt", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	DWORD written;
+	WriteFile(file, ev->data, ev->data_len, &written, NULL);
+	CloseHandle(file);
+
+	// winpr_HexDump(TAG, WLOG_DEBUG, ev->data, ev->data_len);
 	return TRUE;
 }
 
