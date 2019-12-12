@@ -52,8 +52,8 @@ set(${MODULE_PREFIX}_SRCS
   pf_rdpsnd.h
   pf_capture.c
   pf_capture.h
-  pf_stealer.c
-  pf_stealer.h
+  clipboard_state.c
+  clipboard_state.h
   pf_log.h
   )
 

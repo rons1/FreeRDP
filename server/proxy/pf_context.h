@@ -34,7 +34,7 @@
 
 #include "pf_config.h"
 #include "pf_server.h"
-#include "pf_stealer.h"
+#include "clipboard_state.h"
 
 typedef struct proxy_data proxyData;
 
