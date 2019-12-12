@@ -46,6 +46,13 @@ struct file_stream
 	BOOL passed_filter;
 };
 
+typedef BOOL (*psReceivedFileContentsRequest)(pfClipboard* state,
+                                              const CLIPRDR_FILE_CONTENTS_REQUEST* request);
+typedef BOOL (*psReceivedFileContentsResponse)(pfClipboard* state,
+                                               const CLIPRDR_FILE_CONTENTS_RESPONSE* response);
+typedef BOOL (*psReceivedFileList)(pfClipboard* state, FILEDESCRIPTOR* descriptors, UINT count);
+typedef BOOL (*psReceivedFormatList)(pfClipboard* state, const CLIPRDR_FORMAT_LIST* formatList);
+
 struct pf_clipboard
 {
 	CLIPBOARD_OWNER owner;
@@ -63,19 +70,16 @@ struct pf_clipboard
 	UINT32 clipDataId;
 	UINT32 requestedFormatId;
 	BOOL haveClipDataId;
+
+	psReceivedFileContentsRequest OnReceivedFileContentsRequest;
+	psReceivedFileContentsResponse OnReceivedFileContentsResponse;
+	psReceivedFileList OnReceivedFileList;
+	psReceivedFormatList OnReceivedFormatList;
 };
 
 fileStream* pf_clipboard_get_current_stream(pfClipboard* clipboard);
 fileStream* pf_clipboard_get_stream(pfClipboard* clipboard, UINT32 index);
 void pf_clipboard_stream_free(pfClipboard* clipboard, UINT32 listIndex);
-
-void pf_clipboard_state_update_request_info(pfClipboard* clipboard,
-                                            const CLIPRDR_FILE_CONTENTS_REQUEST* request);
-void pf_clipboard_state_update_format_list(pfClipboard* clipboard, const CLIPRDR_FORMAT_LIST* list);
-
-BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* array, UINT count);
-BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
-                                         const CLIPRDR_FILE_CONTENTS_RESPONSE* response);
 
 BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard);
 BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQUEST* request,

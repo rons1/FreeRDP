@@ -22,12 +22,12 @@
 #include <winpr/collections.h>
 
 #include "pf_log.h"
-#include "pf_stealer.h"
+#include "clipboard_state.h"
 
-#define TAG PROXY_TAG("clipboard.common")
+#define TAG PROXY_TAG("clipboard.state")
 
-BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors,
-                                         UINT count)
+static BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors,
+                                                UINT count)
 {
 	size_t i;
 	void* tmp;
@@ -95,8 +95,8 @@ fileStream* pf_clipboard_get_stream(pfClipboard* clipboard, UINT32 index)
 	return &clipboard->streams[index];
 }
 
-void pf_clipboard_state_update_format_list(pfClipboard* clipboard,
-                                           const CLIPRDR_FORMAT_LIST* formatList)
+static BOOL pf_clipboard_state_update_format_list(pfClipboard* clipboard,
+                                                  const CLIPRDR_FORMAT_LIST* formatList)
 {
 	size_t i;
 
@@ -109,13 +109,15 @@ void pf_clipboard_state_update_format_list(pfClipboard* clipboard,
 		{
 			clipboard->fileListFormatId = formatList->formats[i].formatId;
 			WLog_DBG(TAG, "file list format id: 0x%x", clipboard->fileListFormatId);
-			return;
+			return TRUE;
 		}
 	}
+
+	return TRUE;
 }
 
-void pf_clipboard_state_update_request_info(pfClipboard* clipboard,
-                                            const CLIPRDR_FILE_CONTENTS_REQUEST* request)
+static BOOL pf_clipboard_state_update_request_info(pfClipboard* clipboard,
+                                                   const CLIPRDR_FILE_CONTENTS_REQUEST* request)
 {
 	clipboard->requestedFileIndex = request->listIndex;
 	clipboard->requestedDwFlags = request->dwFlags;
@@ -125,12 +127,18 @@ void pf_clipboard_state_update_request_info(pfClipboard* clipboard,
 		clipboard->clipDataId = request->clipDataId;
 	else
 		clipboard->clipDataId = 0;
+
+	return TRUE;
 }
 
-BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
-                                         const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
+static BOOL pf_clipboard_state_update_file_data(pfClipboard* clipboard,
+                                                const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
 	fileStream* stream = pf_clipboard_get_current_stream(clipboard);
+
+	/* no need to do anything if this is a response for FILECONTENTS_SIZE request */
+	if (clipboard->requestedDwFlags == FILECONTENTS_SIZE)
+		return TRUE;
 
 	if (!stream)
 	{
@@ -171,6 +179,11 @@ pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientC
 
 	pfc->server = server;
 	pfc->client = client;
+
+	pfc->OnReceivedFileContentsRequest = pf_clipboard_state_update_request_info;
+	pfc->OnReceivedFileContentsResponse = pf_clipboard_state_update_file_data;
+	pfc->OnReceivedFileList = pf_clipboard_state_update_file_list;
+	pfc->OnReceivedFormatList = pf_clipboard_state_update_format_list;
 	return pfc;
 }
 

@@ -83,7 +83,7 @@ static BOOL clipboard_handle_file_list(pfClipboard* clipboard,
 	}
 
 	WLog_INFO(TAG, "successfully parsed file list: count=%d", files_count);
-	return pf_clipboard_state_update_file_list(clipboard, files, files_count);
+	return clipboard->OnReceivedFileList(clipboard, files, files_count);
 }
 
 static INLINE BOOL clipboard_is_text_format(UINT32 format)
@@ -175,7 +175,8 @@ static UINT clipboard_handle_file_contents_request(proxyData* pdata, pfClipboard
 
 	WLog_INFO(TAG, __FUNCTION__);
 
-	pf_clipboard_state_update_request_info(clipboard, request);
+	if (!clipboard->OnReceivedFileContentsRequest(clipboard, request))
+		return ERROR_INTERNAL_ERROR;
 
 	if (!pdata->config->BufferFileData || request->dwFlags == FILECONTENTS_SIZE)
 	{
@@ -247,9 +248,9 @@ static UINT clipboard_ClientFormatList(CliprdrServerContext* context,
                                        const CLIPRDR_FORMAT_LIST* formatList)
 {
 	proxyData* pdata = (proxyData*)context->custom;
-	pServerContext* ps = pdata->ps;
 	pClientContext* pc = pdata->pc;
 	CliprdrClientContext* client = pc->cliprdr;
+	pfClipboard* clipboard = pdata->ps->clipboard;
 	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
@@ -260,7 +261,9 @@ static UINT clipboard_ClientFormatList(CliprdrServerContext* context,
 		return client->ClientFormatList(client, &list);
 	}
 
-	pf_clipboard_state_update_format_list(ps->clipboard, formatList);
+	if (!clipboard->OnReceivedFormatList(clipboard, formatList))
+		return ERROR_INTERNAL_ERROR;
+
 	return client->ClientFormatList(client, formatList);
 }
 
@@ -454,9 +457,6 @@ clipboard_handle_filecontents_range_response(pfClipboard* clipboard,
 	WLog_INFO(TAG, "received file contents response from peer: data len=%" PRIu32 "",
 	          response->cbRequested);
 
-	if (!pf_clipboard_state_update_file_data(clipboard, response))
-		return ERROR_INTERNAL_ERROR;
-
 	if (stream->m_lOffset.QuadPart == total_size)
 	{
 		rdpContext* ps = (rdpContext*)clipboard->server->custom;
@@ -500,6 +500,9 @@ static UINT clipboard_handle_file_contents_response(pfClipboard* clipboard,
 	if (response->msgFlags == CB_RESPONSE_FAIL)
 		return ERROR_INTERNAL_ERROR;
 
+	if (!clipboard->OnReceivedFileContentsResponse(clipboard, response))
+		return ERROR_INTERNAL_ERROR;
+
 	switch (clipboard->requestedDwFlags)
 	{
 		case FILECONTENTS_SIZE:
@@ -510,6 +513,7 @@ static UINT clipboard_handle_file_contents_response(pfClipboard* clipboard,
 			return ERROR_BAD_ARGUMENTS;
 	}
 }
+
 static UINT clipboard_ClientFileContentsResponse(CliprdrServerContext* context,
                                                  const CLIPRDR_FILE_CONTENTS_RESPONSE* response)
 {
@@ -545,8 +549,9 @@ static UINT clipboard_ServerFormatList(CliprdrClientContext* context,
 {
 	proxyData* pdata = (proxyData*)context->custom;
 	pServerContext* ps = pdata->ps;
-	pClientContext* pc = pdata->pc;
 	CliprdrServerContext* server = ps->cliprdr;
+	pfClipboard* clipboard = pdata->pc->clipboard;
+
 	WLog_INFO(TAG, __FUNCTION__);
 
 	if (pdata->config->TextOnly)
@@ -556,7 +561,9 @@ static UINT clipboard_ServerFormatList(CliprdrClientContext* context,
 		return server->ServerFormatList(server, &list);
 	}
 
-	pf_clipboard_state_update_format_list(pc->clipboard, formatList);
+	if (!clipboard->OnReceivedFormatList(clipboard, formatList))
+		return ERROR_INTERNAL_ERROR;
+
 	return server->ServerFormatList(server, formatList);
 }
 

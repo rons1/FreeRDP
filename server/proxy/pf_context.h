@@ -36,7 +36,7 @@
 
 #include "pf_config.h"
 #include "pf_server.h"
-#include "pf_stealer.h"
+#include "clipboard_state.h"
 
 #define PROXY_SESSION_ID_LENGTH 32
 
