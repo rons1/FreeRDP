@@ -65,8 +65,8 @@ BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR*
 		FILEDESCRIPTOR file = clipboard->descriptors[i];
 		fileStream* stream = &clipboard->streams[i];
 
-		stream->m_lSize.LowPart = file.nFileSizeLow;
-		stream->m_lSize.HighPart = file.nFileSizeHigh;
+		stream->m_lSize.u.LowPart = file.nFileSizeLow;
+		stream->m_lSize.u.HighPart = file.nFileSizeHigh;
 		stream->data = Stream_New(NULL, stream->m_lSize.QuadPart);
 
 		if (!stream->data)
@@ -182,8 +182,8 @@ BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQ
 	UINT32 actual_chunk_size;
 	ULARGE_INTEGER requested_offset;
 
-	requested_offset.LowPart = request->nPositionLow;
-	requested_offset.HighPart = request->nPositionHigh;
+	requested_offset.u.LowPart = request->nPositionLow;
+	requested_offset.u.HighPart = request->nPositionHigh;
 
 	/* invalid offset */
 	if (requested_offset.QuadPart >= file_size)
