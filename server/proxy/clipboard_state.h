@@ -3,7 +3,6 @@
  * FreeRDP Proxy Server
  *
  * Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
- * Copyright 2019 Idan Freiberg <speidy@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,6 +83,8 @@ void pf_clipboard_stream_free(pfClipboard* clipboard, UINT32 listIndex);
 BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard);
 BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQUEST* request,
                              UINT32* actual_size, BOOL* last_chunk);
+BOOL pf_clipboard_state_change_file_name(pfClipboard* clipboard, UINT32 listIndex,
+                                         const char* new_name);
 
 pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientContext* client,
                                     CLIPBOARD_OWNER owner);
