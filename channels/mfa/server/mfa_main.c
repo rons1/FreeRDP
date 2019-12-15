@@ -418,6 +418,9 @@ UINT mfa_server_read(MfaServerContext* context)
 		if (status == WAIT_TIMEOUT)
 			return CHANNEL_RC_OK;
 
+		if (!Stream_EnsureRemainingCapacity(s, BytesToRead))
+			return CHANNEL_RC_NO_MEMORY;
+
 		if (!WTSVirtualChannelRead(mfa->ChannelHandle, 0, (PCHAR)Stream_Pointer(s), BytesToRead,
 		                           &BytesReturned))
 		{
@@ -432,11 +435,15 @@ UINT mfa_server_read(MfaServerContext* context)
 	{
 		position = Stream_GetPosition(s);
 		Stream_SetPosition(s, 0);
+
+		if (!Stream_EnsureRemainingCapacity(s, MFA_HEADER_LENGTH))
+			return CHANNEL_RC_NO_MEMORY;
+
 		Stream_Read_UINT16(s, header.msgType);  /* msgType (2 bytes) */
 		Stream_Read_UINT16(s, header.msgFlags); /* msgFlags (2 bytes) */
 		Stream_Read_UINT32(s, header.dataLen);  /* dataLen (4 bytes) */
 
-		if (!Stream_EnsureCapacity(s, (header.dataLen + MFA_HEADER_LENGTH)))
+		if (!Stream_EnsureRemainingCapacity(s, header.dataLen))
 		{
 			WLog_ERR(TAG, "Stream_EnsureCapacity failed!");
 			return CHANNEL_RC_NO_MEMORY;
@@ -459,6 +466,9 @@ UINT mfa_server_read(MfaServerContext* context)
 
 			if (status == WAIT_TIMEOUT)
 				return CHANNEL_RC_OK;
+
+			if (!Stream_EnsureRemainingCapacity(s, BytesToRead))
+				return CHANNEL_RC_NO_MEMORY;
 
 			if (!WTSVirtualChannelRead(mfa->ChannelHandle, 0, (PCHAR)Stream_Pointer(s), BytesToRead,
 			                           &BytesReturned))
