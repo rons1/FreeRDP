@@ -67,6 +67,10 @@ static BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESC
 
 		stream->m_lSize.u.LowPart = file.nFileSizeLow;
 		stream->m_lSize.u.HighPart = file.nFileSizeHigh;
+
+		if (stream->m_lSize.QuadPart == 0)
+			continue;
+
 		stream->data = Stream_New(NULL, stream->m_lSize.QuadPart);
 
 		if (!stream->data)
@@ -166,6 +170,26 @@ BOOL pf_clipboard_state_is_file_list_format(pfClipboard* clipboard)
 	return clipboard->fileListFormatId == clipboard->requestedFormatId;
 }
 
+BOOL pf_clipboard_state_change_file_name(pfClipboard* clipboard, UINT32 listIndex,
+                                         const char* new_name)
+{
+	int rc;
+	size_t len;
+	WCHAR* outStr = NULL;
+	rc = ConvertToUnicode(CP_UTF8, 0, new_name, -1, &outStr, 0);
+
+	if (rc < 0)
+		return FALSE;
+
+	len = ((size_t)rc) * 2;
+	if (len + 1 >= 260)
+		return FALSE;
+
+	clipboard->descriptors[listIndex].cFileName[len + 1] = '\0';
+	CopyMemory(clipboard->descriptors[listIndex].cFileName, outStr, len);
+	return TRUE;
+}
+
 pfClipboard* pf_clipboard_state_new(CliprdrServerContext* server, CliprdrClientContext* client,
                                     CLIPBOARD_OWNER owner)
 {
@@ -194,6 +218,9 @@ BYTE* pf_clipboard_get_chunk(fileStream* stream, const CLIPRDR_FILE_CONTENTS_REQ
 	UINT32 nreq = request->cbRequested;
 	UINT32 actual_chunk_size;
 	ULARGE_INTEGER requested_offset;
+
+	if (nreq == 0)
+		return NULL;
 
 	requested_offset.u.LowPart = request->nPositionLow;
 	requested_offset.u.HighPart = request->nPositionHigh;

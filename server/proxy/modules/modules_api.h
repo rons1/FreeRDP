@@ -156,6 +156,7 @@ struct file_metadata_event
 {
 	BOOL client_to_server;
 	UINT64 total_size;
+	char* new_name;
 };
 #define WINPR_PACK_POP
 #include <winpr/pack.h>
