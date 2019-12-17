@@ -260,6 +260,9 @@ void pf_clipboard_state_free(pfClipboard* clipboard)
 {
 	size_t i;
 
+	if (!clipboard)
+		return;
+
 	free(clipboard->descriptors);
 	clipboard->descriptors = NULL;
 

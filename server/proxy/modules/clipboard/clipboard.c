@@ -25,32 +25,43 @@
 
 #define TAG MODULE_TAG("clipboard_filter")
 
+static UINT64 file_index = 1;
+
 static BOOL clipboard_file_metadata_received(moduleOperations* module, rdpContext* context,
                                              void* param)
 {
+	int rc;
+	size_t size;
 	proxyPreFileCopyEventInfo* ev = (proxyPreFileCopyEventInfo*)param;
+
 	if (ev == NULL)
 		return FALSE;
 
-	/* update file name to kubistika.txt */
-	ev->new_name = _strdup("kubistika.txt");
+	char* new_name;
+
+	rc = snprintf(NULL, 0, "freerdp-proxy-file_%ld.txt", file_index);
+	if (rc < 0)
+		return FALSE;
+
+	size = (size_t)rc;
+	new_name = malloc(size + 1);
+	rc = sprintf(new_name, "freerdp-proxy-file_%ld.txt", file_index);
+	if (rc < 0 || (size_t)rc != size)
+		return FALSE;
+
+	file_index++;
+	ev->new_name = new_name;
 	return TRUE;
 }
 
 static BOOL clipboard_file_data_received(moduleOperations* module, rdpContext* context, void* param)
 {
 	proxyFileCopyEventInfo* ev = (proxyFileCopyEventInfo*)param;
-	printf("module got file: client to server=%d\n", ev->client_to_server);
-	/* dump file data to file */
-	HANDLE file;
-	file =
-	    CreateFileA("test.txt", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	WLog_INFO(TAG, "module got file: client to server=%d\n", ev->client_to_server);
 
-	DWORD written;
-	WriteFile(file, ev->data, ev->data_len, &written, NULL);
-	CloseHandle(file);
-
-	// winpr_HexDump(TAG, WLOG_DEBUG, ev->data, ev->data_len);
+	char* new_data = _strdup("hello, this file was modified by freerdp-proxy.");
+	ev->new_data = (BYTE*)new_data;
+	ev->new_data_len = strlen(new_data);
 	return TRUE;
 }
 

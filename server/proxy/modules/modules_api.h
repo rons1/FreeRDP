@@ -150,6 +150,8 @@ struct file_data_event
 	BOOL client_to_server; /* direction */
 	BYTE* data;            /* file data */
 	UINT64 data_len;       /* file size */
+	BYTE* new_data;
+	UINT64 new_data_len;
 };
 
 struct file_metadata_event

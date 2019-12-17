@@ -244,7 +244,7 @@ static UINT clipboard_handle_file_contents_request(proxyData* pdata, pfClipboard
 	CliprdrClientContext* client = clipboard->client;
 	fileStream* current;
 	BOOL all_sent;
-	UINT32 n = request->cbRequested;
+	UINT32 n;
 	BYTE* requested_data = NULL;
 
 	WLog_INFO(TAG, __FUNCTION__);
@@ -510,17 +510,28 @@ clipboard_handle_filecontents_range_response(pfClipboard* clipboard,
 	else if (stream->m_lOffset.QuadPart == total_size)
 	{
 		rdpContext* ps = (rdpContext*)clipboard->server->custom;
-		proxyFileCopyEventInfo event;
+		proxyFileCopyEventInfo event = { 0 };
 		event.data = Stream_Buffer(stream->data);
 		event.data_len = total_size;
 		event.client_to_server = (clipboard->owner == CLIPBOARD_OWNER_SERVER);
 
-		WLog_INFO(TAG, "constructed file in memory: index=%d", index);
+		WLog_INFO(TAG, "constructed file in memory: index=%" PRIu16 "", index);
 		stream->passed_filter = pf_modules_run_filter(FILTER_TYPE_CLIPBOARD_FILE_DATA, ps, &event);
+		if (stream->passed_filter && event.new_data != NULL)
+		{
+			/* file data was modified by filter */
+			WLog_INFO(TAG, "file data was altered by a proxy module: new file size=%" PRIu64 "",
+			          event.new_data_len);
+
+			Stream_Free(stream->data, TRUE);
+			stream->data = Stream_New(event.new_data, event.new_data_len);
+			stream->m_lSize.QuadPart = event.new_data_len;
+		}
 
 		/* respond to remote server with file size */
 		return cliprdr_send_response_filecontents(clipboard, response->streamId, index,
-		                                          (BYTE*)&total_size, 8, CB_RESPONSE_OK);
+		                                          (BYTE*)&stream->m_lSize.QuadPart, 8,
+		                                          CB_RESPONSE_OK);
 	}
 
 	return ERROR_INTERNAL_ERROR;
