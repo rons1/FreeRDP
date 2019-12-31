@@ -337,6 +337,7 @@ static BOOL pf_client_connect(freerdp* instance)
 
 	if (!freerdp_connect(instance))
 	{
+		pf_modules_run_hook(HOOK_TYPE_CLIENT_LOGIN_FAILURE, pc->pdata);
 		WLog_ERR(TAG, "failed to connect with NLA. disabling NLA and retyring...");
 
 		if (!pf_client_connect_without_nla(pc))
@@ -361,7 +362,6 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 {
 	freerdp* instance = (freerdp*)arg;
 	pClientContext* pc = (pClientContext*)instance->context;
-	pServerContext* ps = pc->pdata->ps;
 	proxyData* pdata = pc->pdata;
 	DWORD nCount;
 	DWORD status;
@@ -376,7 +376,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 	 */
 	handles[64] = pdata->abort_event;
 
-	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_PRE_CONNECT, (rdpContext*)ps))
+	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_PRE_CONNECT, pdata))
 	{
 		proxy_data_abort_connect(pdata);
 		return FALSE;

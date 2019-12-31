@@ -56,9 +56,6 @@ struct p_server_context
 	DispServerContext* disp;
 	CliprdrServerContext* cliprdr;
 	RdpsndServerContext* rdpsnd;
-
-	/* used to external modules to store per-session info */
-	wHashTable* modules_info;
 };
 typedef struct p_server_context pServerContext;
 
@@ -108,6 +105,9 @@ struct proxy_data
 	HANDLE abort_event;
 	HANDLE client_thread;
 	HANDLE gfx_server_ready;
+
+	/* used to external modules to store per-session info */
+	wHashTable* modules_info;
 };
 
 BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src);
