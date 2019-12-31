@@ -26,20 +26,38 @@
 
 #include <freerdp/build-config.h>
 #include <winpr/collections.h>
+#include <stdlib.h>
+#include <signal.h>
 
 #define TAG PROXY_TAG("server")
+
+static proxyConfig config = { 0 };
+
+static void sigint_handler(int signum)
+{
+	printf("\n");
+	WLog_INFO(TAG, "caught SIGINT, terminating...");
+
+	WLog_INFO(TAG, "freeing loaded modules and plugins.");
+	pf_modules_free();
+
+	WLog_INFO(TAG, "freeing config.");
+	pf_server_config_free_internal(&config);
+
+	WLog_INFO(TAG, "exiting.");
+	exit(signum);
+}
 
 int main(int argc, char* argv[])
 {
 	const char* cfg = "config.ini";
 	int status = 0;
-	proxyConfig* config = calloc(1, sizeof(proxyConfig));
-
-	if (!config)
-		return -1;
 
 	if (argc > 1)
 		cfg = argv[1];
+
+	/* Register SIGINT handler for graceful termination */
+	signal(SIGINT, sigint_handler);
 
 	if (!pf_modules_init(FREERDP_PROXY_PLUGINDIR))
 	{
@@ -49,13 +67,13 @@ int main(int argc, char* argv[])
 
 	pf_modules_list_loaded_plugins();
 
-	if (!pf_server_config_load(cfg, config))
+	if (!pf_server_config_load(cfg, &config))
 		goto fail;
 
-	pf_server_config_print(config);
-	status = pf_server_start(config);
+	pf_server_config_print(&config);
+	status = pf_server_start(&config);
 fail:
 	pf_modules_free();
-	pf_server_config_free(config);
+	pf_server_config_free_internal(&config);
 	return status;
 }

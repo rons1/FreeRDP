@@ -37,10 +37,16 @@ static BOOL demo_filter_keyboard_event(proxyData* pdata, void* param)
 	if (event_data->rdp_scan_code == RDP_SCANCODE_KEY_B)
 	{
 		/* user typed 'B', that means bye :) */
-		std::cout << "C++ proxy plugin: aborting connection" << std::endl;
+		std::cout << "C++ demo plugin: aborting connection" << std::endl;
 		g_plugins_manager->AbortConnect(pdata);
 	}
 
+	return TRUE;
+}
+
+static BOOL demo_plugin_unload()
+{
+	std::cout << "C++ demo plugin: unloading..." << std::endl;
 	return TRUE;
 }
 
@@ -53,7 +59,8 @@ static proxyPlugin demo_plugin = {
 	NULL,                       /* ServerChannelsInit */
 	NULL,                       /* ServerChannelsFree */
 	demo_filter_keyboard_event, /* KeyboardEvent */
-	NULL                        /* MouseEvent */
+	NULL,                       /* MouseEvent */
+	demo_plugin_unload          /* PluginUnload */
 };
 
 BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)

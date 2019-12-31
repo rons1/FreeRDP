@@ -54,6 +54,8 @@ typedef struct proxy_plugin
 	/* proxy filters. a module can set these function pointers to register filters */
 	proxyFilterFn KeyboardEvent;
 	proxyFilterFn MouseEvent;
+
+	BOOL (*PluginUnload)();
 } proxyPlugin;
 
 /*

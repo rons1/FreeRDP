@@ -212,6 +212,7 @@ static BOOL pf_modules_register_plugin(proxyPlugin* plugin_to_register)
 
 	assert(plugins_list != NULL);
 
+	/* make sure there's no other loaded plugin with the same name of `plugin_to_register`. */
 	ArrayList_ForEach(plugins_list, proxyPlugin*, index, plugin)
 	{
 		if (strcmp(plugin->name, plugin_to_register->name) == 0)
@@ -368,7 +369,7 @@ void pf_modules_free(void)
 		{
 			if (!IFCALLRESULT(TRUE, plugin->PluginUnload))
 				WLog_WARN(TAG, "PluginUnload failed for plugin '%s'", plugin->name);
-		};
+		}
 
 		ArrayList_Free(plugins_list);
 		plugins_list = NULL;
