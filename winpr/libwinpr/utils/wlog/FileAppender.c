@@ -147,7 +147,13 @@ static BOOL WLog_FileAppender_WriteMessage(wLog* log, wLogAppender* appender, wL
 	message->PrefixString = prefix;
 	WLog_Layout_GetMessagePrefix(log, appender->Layout, message);
 	fprintf(fp, "%s%s\n", message->PrefixString, message->TextString);
-	fflush(fp); /* slow! */
+
+	if (WLog_GetLogLevel(log) <= WLOG_DEBUG)
+	{
+		/* if debugging, flush log immediately, to ensure all logs will be written */
+		fflush(fp);
+	}
+
 	return TRUE;
 }
 
