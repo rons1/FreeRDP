@@ -35,6 +35,8 @@ void WLog_Appender_Free(wLog* log, wLogAppender* appender)
 	}
 
 	DeleteCriticalSection(&appender->lock);
+
+	WLog_CloseAppender(log);
 	appender->Free(appender);
 }
 
