@@ -169,8 +169,11 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 		return FALSE;
 	}
 
-	if (!pf_client_load_passthrough_channel(instance->context, BKEY_CHANNEL_NAME))
-		return FALSE;
+	if (WTSVirtualChannelManagerIsChannelJoined(ps->vcm, BKEY_CHANNEL_NAME))
+	{
+		if (!pf_client_load_passthrough_channel(instance->context, BKEY_CHANNEL_NAME))
+			return FALSE;
+	}
 
 	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
 	{
