@@ -152,11 +152,13 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	}
 	else if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
 	{
-		if (!ps->gfx->Close(ps->gfx))
-			WLog_ERR(TAG, "failed to close gfx server");
+		/* dynamic channel - closed on client OnClose callback */
 
 		gdi_graphics_pipeline_uninit(context->gdi, pc->gfx_decoder);
 		rdpgfx_client_context_free(pc->gfx_decoder);
+
+		pc->gfx_proxy = NULL;
+		pc->gfx_decoder = NULL;
 	}
 	else if (strcmp(e->name, RAIL_SVC_CHANNEL_NAME) == 0)
 	{
@@ -167,9 +169,7 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	}
 	else if (strcmp(e->name, DISP_DVC_CHANNEL_NAME) == 0)
 	{
-		if (ps->disp->Close(ps->disp) != CHANNEL_RC_OK)
-			WLog_ERR(TAG, "failed to close disp server");
-
+		/* dynamic channel - closed on client OnClose callback */
 		pc->disp = NULL;
 	}
 	else if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)

@@ -254,6 +254,15 @@ static UINT disp_on_data_received(IWTSVirtualChannelCallback* pChannelCallback, 
  */
 static UINT disp_on_close(IWTSVirtualChannelCallback* pChannelCallback)
 {
+	DISP_CHANNEL_CALLBACK* callback = (DISP_CHANNEL_CALLBACK*)pChannelCallback;
+	DISP_PLUGIN* disp = (DISP_PLUGIN*)callback->plugin;
+	DispClientContext* context = (DispClientContext*)disp->iface.pInterface;
+
+	if (context)
+	{
+		IFCALL(context->OnClose, context);
+	}
+
 	free(pChannelCallback);
 	return CHANNEL_RC_OK;
 }

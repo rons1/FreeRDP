@@ -61,6 +61,14 @@ static UINT pf_disp_on_caps_control(DispClientContext* context, UINT32 MaxNumMon
 	return server->DisplayControlCaps(server);
 }
 
+static UINT pf_disp_on_close(DispClientContext* context)
+{
+	proxyData* pdata = (proxyData*)context->custom;
+	DispServerContext* server = (DispServerContext*)pdata->ps->disp;
+	WLog_INFO(TAG, "disp client closing, closing server.");
+	return server->Close(server);
+}
+
 void pf_disp_register_callbacks(DispClientContext* client, DispServerContext* server,
                                 proxyData* pdata)
 {
@@ -68,6 +76,7 @@ void pf_disp_register_callbacks(DispClientContext* client, DispServerContext* se
 	server->custom = (void*)pdata;
 	/* client receives from server, forward using disp server to original client */
 	client->DisplayControlCaps = pf_disp_on_caps_control;
+	client->OnClose = pf_disp_on_close;
 	/* server receives from client, forward to target server using disp client */
 	server->DispMonitorLayout = pf_disp_monitor_layout;
 }
