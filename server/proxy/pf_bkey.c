@@ -89,7 +89,7 @@ static BOOL bkey_validate_message_type(wStream* input, UINT32 expected_message_t
 {
 	UINT32 message_type;
 
-	Stream_Read_UINT32_BE(input, message_type);        /* 4 bytes - message type */
+	Stream_Read_UINT32_BE(input, message_type); /* 4 bytes - message type */
 
 	if (message_type != expected_message_type)
 	{
@@ -103,7 +103,7 @@ static BOOL bkey_validate_message_type(wStream* input, UINT32 expected_message_t
 
 static BOOL bkey_verify_server_pdu(wStream* input, UINT32 expected_message_type)
 {
-	if (!Stream_EnsureRemainingCapacity(input, 148))
+	if (Stream_GetRemainingLength(input) < 148)
 		return FALSE;
 
 	if (!pf_bkey_check_build_info(input))
@@ -121,7 +121,7 @@ static BOOL bkey_verify_client_pdu(wStream* input, UINT32 expected_message_type)
 {
 	UINT32 data_len;
 
-	if (!Stream_EnsureRemainingCapacity(input, 4))
+	if (Stream_GetRemainingLength(input) < 4)
 		return FALSE;
 
 	/* first 4 bytes is data length */
@@ -220,7 +220,7 @@ static UINT pf_bkey_data_received_from_client(PassthroughServerContext* context,
 		WLog_WARN(TAG, "bkey_recv_from_client: pf_bkey_check_current_state failed!");
 		return ERROR_INTERNAL_ERROR;
 	}
-	
+
 	return client->SendData(client, data, len);
 }
 
@@ -241,7 +241,7 @@ static UINT pf_bkey_data_received_from_server(PassthroughClientContext* context,
 		WLog_WARN(TAG, "bkey_recv_from_server: pf_bkey_check_current_state failed!");
 		return ERROR_INTERNAL_ERROR;
 	}
-	
+
 	return server->SendData(server, data, len);
 }
 
