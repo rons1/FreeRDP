@@ -53,7 +53,7 @@ enum bkey_state
 #define STATE_OK STATE_DETECT_FINGER_RESPONSE + 1
 
 /* static variable holding the current verification state */
-static enum bkey_state g_current_state = STATE_FIRST_SERVER_PDU;
+static wHashTable* g_current_states = NULL;
 
 /* state handlers */
 typedef BOOL (*state_handler)(wStream*, enum bkey_state*);
@@ -183,23 +183,27 @@ static BOOL bkey_verify_detect_finger_response(wStream* input, enum bkey_state* 
 	return TRUE;
 }
 
-static BOOL pf_bkey_check_current_state(wStream* input)
+static BOOL pf_bkey_check_current_state(proxyData* pdata, wStream* input)
 {
-	enum bkey_state next = g_current_state + 1;
+	enum bkey_state current_state;
+	enum bkey_state next;
 
-	WLog_DBG(TAG, "pf_bkey_check_current_state: current state: %d", g_current_state);
-	if (g_current_state == STATE_OK)
+	current_state = (enum bkey_state)HashTable_GetItemValue(g_current_states, pdata);
+	next = current_state + 1;
+
+	WLog_DBG(TAG, "pf_bkey_check_current_state: current state: %d", current_state);
+	if (current_state == STATE_OK)
 		return TRUE;
 
-	state_handler handler = state_handlers[g_current_state];
+	state_handler handler = state_handlers[current_state];
 	if (!handler(input, &next))
 	{
-		WLog_ERR(TAG, "handler %d failed!", g_current_state);
+		WLog_ERR(TAG, "handler %d failed!", current_state);
 		return FALSE;
 	}
 
 	/* proceed to next state */
-	g_current_state = next;
+	HashTable_SetItemValue(g_current_states, pdata, (void*)next);
 	return TRUE;
 }
 
@@ -215,7 +219,7 @@ static UINT pf_bkey_data_received_from_client(PassthroughServerContext* context,
 
 	Stream_StaticInit(&s, (BYTE*)data, len);
 
-	if (!pf_bkey_check_current_state(&s))
+	if (!pf_bkey_check_current_state(pdata, &s))
 	{
 		WLog_WARN(TAG, "bkey_recv_from_client: pf_bkey_check_current_state failed!");
 		return ERROR_INTERNAL_ERROR;
@@ -236,13 +240,27 @@ static UINT pf_bkey_data_received_from_server(PassthroughClientContext* context,
 
 	Stream_StaticInit(&s, (BYTE*)data, len);
 
-	if (!pf_bkey_check_current_state(&s))
+	if (!pf_bkey_check_current_state(pdata, &s))
 	{
 		WLog_WARN(TAG, "bkey_recv_from_server: pf_bkey_check_current_state failed!");
 		return ERROR_INTERNAL_ERROR;
 	}
 
 	return server->SendData(server, data, len);
+}
+
+BOOL pf_bkey_state_machine_init()
+{
+	g_current_states = HashTable_New(TRUE);
+	if (!g_current_states)
+		return FALSE;
+
+	return TRUE;
+}
+
+void pf_bkey_state_machine_uninit()
+{
+	HashTable_Free(g_current_states);
 }
 
 BOOL pf_server_bkey_init(pServerContext* ps)

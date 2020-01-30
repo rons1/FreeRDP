@@ -29,6 +29,9 @@
 
 BOOL pf_server_bkey_init(pServerContext* ps);
 void pf_bkey_pipeline_init(PassthroughClientContext* client, PassthroughServerContext* server,
-                             proxyData* pdata);
+                           proxyData* pdata);
+
+BOOL pf_bkey_state_machine_init();
+void pf_bkey_state_machine_uninit();
 
 #endif /* FREERDP_SERVER_PROXY_PFBKEY_H */

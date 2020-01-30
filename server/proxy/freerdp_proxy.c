@@ -23,6 +23,7 @@
 #include "pf_config.h"
 #include "pf_log.h"
 #include "pf_modules.h"
+#include "pf_bkey.h"
 
 #include <freerdp/build-config.h>
 #include <winpr/collections.h>
@@ -46,6 +47,8 @@ static void cleanup_handler(int signum)
 
 	pf_server_config_free(server->config);
 	pf_server_free(server);
+
+	pf_bkey_state_machine_uninit();
 
 	WLog_INFO(TAG, "exiting.");
 	exit(0);
@@ -103,6 +106,8 @@ int main(int argc, char* argv[])
 	pf_modules_list_loaded_plugins();
 	if (!is_all_required_modules_loaded(config))
 		goto fail;
+
+	pf_bkey_state_machine_init();
 
 	server = pf_server_new(config);
 	if (!server)
