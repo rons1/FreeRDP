@@ -77,6 +77,25 @@ static rdpMcsChannel* freerdp_channels_find_channel_by_name(rdpRdp* rdp, const c
 	return NULL;
 }
 
+static rdpMcsChannel* freerdp_channels_find_channel_by_id(rdpRdp* rdp, UINT16 channel_id)
+{
+	UINT32 index;
+	rdpMcsChannel* channel;
+	rdpMcs* mcs = rdp->mcs;
+
+	for (index = 0; index < mcs->channelCount; index++)
+	{
+		channel = &mcs->channels[index];
+
+		if (channel->ChannelId == channel_id)
+		{
+			return channel;
+		}
+	}
+
+	return NULL;
+}
+
 static void channel_queue_message_free(wMessage* msg)
 {
 	CHANNEL_OPEN_EVENT* ev;
@@ -441,6 +460,32 @@ int freerdp_channels_data(freerdp* instance, UINT16 channelId, BYTE* data, int d
 	}
 
 	return 0;
+}
+
+UINT16 freerdp_channels_get_id_by_name(freerdp* instance, const char* channel_name)
+{
+	rdpMcsChannel* mcsChannel;
+	if (!instance || !channel_name)
+		return -1;
+
+	mcsChannel = freerdp_channels_find_channel_by_name(instance->context->rdp, channel_name);
+	if (!mcsChannel)
+		return -1;
+
+	return mcsChannel->ChannelId;
+}
+
+const char* freerdp_channels_get_name_by_id(freerdp* instance, UINT16 channelId)
+{
+	rdpMcsChannel* mcsChannel;
+	if (!instance)
+		return NULL;
+
+	mcsChannel = freerdp_channels_find_channel_by_id(instance->context->rdp, channelId);
+	if (!mcsChannel)
+		return NULL;
+
+	return (const char*)mcsChannel->Name;
 }
 
 BOOL freerdp_channels_process_message_free(wMessage* message, DWORD type)
