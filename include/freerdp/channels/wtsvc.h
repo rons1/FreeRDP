@@ -68,6 +68,7 @@ extern "C"
 	 */
 	FREERDP_API UINT16 WTSChannelGetId(freerdp_peer* client, const char* channel_name);
 	FREERDP_API BOOL WTSIsChannelJoinedByName(freerdp_peer* client, const char* channel_name);
+
 	FREERDP_API BOOL WTSIsChannelJoinedById(freerdp_peer* client, const UINT16 channel_id);
 	FREERDP_API BOOL WTSChannelSetHandleByName(freerdp_peer* client, const char* channel_name,
 	                                           void* handle);
@@ -75,6 +76,7 @@ extern "C"
 	                                         void* handle);
 	FREERDP_API void* WTSChannelGetHandleByName(freerdp_peer* client, const char* channel_name);
 	FREERDP_API void* WTSChannelGetHandleById(freerdp_peer* client, const UINT16 channel_id);
+	FREERDP_API const char* WTSGetChannelNameById(freerdp_peer* client, UINT16 channel_id);
 
 #ifdef __cplusplus
 }

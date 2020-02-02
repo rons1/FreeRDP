@@ -443,6 +443,40 @@ int freerdp_channels_data(freerdp* instance, UINT16 channelId, BYTE* data, int d
 	return 0;
 }
 
+UINT16 freerdp_channels_get_id_by_name(freerdp* instance, const char* channel_name)
+{
+	rdpMcs* mcs = instance->context->rdp->mcs;
+	rdpMcsChannel* mcsChannel = NULL;
+	size_t index;
+
+	for (index = 0; index < mcs->channelCount; index++)
+	{
+		mcsChannel = &(mcs->channels[index]);
+		if (strncmp(mcsChannel->Name, channel_name, CHANNEL_NAME_LEN) == 0)
+		{
+			mcsChannel = &(mcs->channels[index]);
+			return mcsChannel->ChannelId;
+		}
+	}
+}
+
+const char* freerdp_channels_get_name_by_id(freerdp* instance, UINT16 channelId)
+{
+	rdpMcs* mcs = instance->context->rdp->mcs;
+	rdpMcsChannel* mcsChannel = NULL;
+	size_t index;
+
+	for (index = 0; index < mcs->channelCount; index++)
+	{
+		mcsChannel = &(mcs->channels[index]);
+		if (mcsChannel->ChannelId == channelId)
+		{
+			mcsChannel = &(mcs->channels[index]);
+			return (const char*)mcsChannel->Name;
+		}
+	}
+}
+
 BOOL freerdp_channels_process_message_free(wMessage* message, DWORD type)
 {
 	if (message->id == WMQ_QUIT)

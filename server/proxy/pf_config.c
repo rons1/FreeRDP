@@ -154,6 +154,9 @@ static BOOL pf_config_load_channels(wIniFile* ini, proxyConfig* config)
 	config->Clipboard = pf_config_get_bool(ini, "Channels", "Clipboard");
 	config->AudioOutput = pf_config_get_bool(ini, "Channels", "AudioOutput");
 	config->RemoteApp = pf_config_get_bool(ini, "Channels", "RemoteApp");
+	config->Passthrough = CommandLineParseCommaSeparatedValues(
+	    pf_config_get_str(ini, "Channels", "Passthrough"), &config->PassthroughCount);
+
 	return TRUE;
 }
 
@@ -284,6 +287,14 @@ out:
 	return NULL;
 }
 
+static void pf_server_config_print_list(char** list, size_t count)
+{
+	size_t i;
+
+	for (i = 0; i < count; i++)
+		WLog_INFO(TAG, "\t\t- %s", list[i]);
+}
+
 void pf_server_config_print(proxyConfig* config)
 {
 	WLog_INFO(TAG, "Proxy configuration:");
@@ -320,6 +331,8 @@ void pf_server_config_print(proxyConfig* config)
 	CONFIG_PRINT_BOOL(config, Clipboard);
 	CONFIG_PRINT_BOOL(config, AudioOutput);
 	CONFIG_PRINT_BOOL(config, RemoteApp);
+	WLog_INFO(TAG, "\tPassthrough:");
+	pf_server_config_print_list(config->Passthrough, config->PassthroughCount);
 
 	CONFIG_PRINT_SECTION("Clipboard");
 	CONFIG_PRINT_BOOL(config, TextOnly);
@@ -336,6 +349,7 @@ void pf_server_config_free(proxyConfig* config)
 	if (config == NULL)
 		return;
 
+	free(config->Passthrough);
 	free(config->CapturesDirectory);
 	free(config->RequiredPlugins);
 	free(config->Modules);

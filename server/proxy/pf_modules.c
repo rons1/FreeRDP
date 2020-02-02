@@ -144,6 +144,13 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 				IFCALLRET(plugin->MouseEvent, result, pdata, param);
 				break;
 
+			case FILTER_TYPE_CLIENT_PASSTHROUGH_CHANNEL_DATA:
+				IFCALLRET(plugin->ClientChannelData, result, pdata, param);
+				break;
+
+			case FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA:
+				IFCALLRET(plugin->ServerChannelData, result, pdata, param);
+				break;
 			default:
 				WLog_ERR(TAG, "invalid filter called");
 		}
