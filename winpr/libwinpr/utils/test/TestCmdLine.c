@@ -19,6 +19,9 @@ int TestCmdLine(int argc, char* argv[])
 	COMMAND_LINE_ARGUMENT_A* arg;
 	int testArgc;
 	char** command_line;
+	size_t count;
+	char** parsed_list = NULL;
+
 	COMMAND_LINE_ARGUMENT_A args[] = {
 		{ "v", COMMAND_LINE_VALUE_REQUIRED, NULL, NULL, NULL, -1, NULL, "destination server" },
 		{ "port", COMMAND_LINE_VALUE_REQUIRED, NULL, NULL, NULL, -1, NULL, "server port" },
@@ -199,9 +202,44 @@ int TestCmdLine(int argc, char* argv[])
 		       height);
 		goto out;
 	}
+
+	/* Test CommandLineParseCommaSeparatedValues */
+	{
+		/* TestCase: empty string as list input */
+		parsed_list = CommandLineParseCommaSeparatedValues("", &count);
+		if (parsed_list != NULL || count != 0)
+		{
+			printf("CommandLineParseCommaSeparatedValues: Expected list=null, count=0, got: "
+			       "list=%p, count=%d\n",
+			       parsed_list, count);
+			goto out;
+		}
+
+		/* TestCase: 2 comma separated strings. */
+		parsed_list = CommandLineParseCommaSeparatedValues("test1,test2", &count);
+		if (!parsed_list || count != 2)
+		{
+			printf("expected count=2. got, count=%d\n", count);
+			goto out;
+		}
+
+		if (strcmp(parsed_list[0], "test1") != 0)
+		{
+			printf("expected parsed_list[0]='test1', got '%s'\n", parsed_list[0]);
+			goto out;
+		}
+
+		if (strcmp(parsed_list[1], "test2") != 0)
+		{
+			printf("expected parsed_list[1]='test2', got '%s'\n", parsed_list[1]);
+			goto out;
+		}
+	}
+
 	ret = 0;
 
 out:
 	string_list_free(command_line);
+	free(parsed_list);
 	return ret;
 }
