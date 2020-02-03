@@ -526,6 +526,10 @@ char** CommandLineParseCommaSeparatedValuesEx(const char* name, const char* list
 
 	prefix = (nArgs + 1UL) * sizeof(char*);
 	len = strlen(list);
+
+	if (len == 0)
+		return NULL;
+
 	p = (char**)calloc(len + prefix + 1, sizeof(char*));
 
 	if (!p)
