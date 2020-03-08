@@ -111,8 +111,8 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
 
 		if (!ok)
 		{
-			WLog_INFO(TAG, "plugin %s, hook %s failed!", plugin->name,
-			          pf_modules_get_hook_type_string(type));
+			WLog_VRB(TAG, "plugin %s, hook %s failed!", plugin->name,
+			         pf_modules_get_hook_type_string(type));
 			return FALSE;
 		}
 	}
