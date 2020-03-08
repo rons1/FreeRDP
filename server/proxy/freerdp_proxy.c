@@ -32,6 +32,7 @@
 #define TAG PROXY_TAG("server")
 
 static proxyServer* server = NULL;
+static proxyConfig* config = NULL;
 
 static void cleanup_handler(int signum)
 {
@@ -44,7 +45,7 @@ static void cleanup_handler(int signum)
 	WLog_INFO(TAG, "freeing loaded modules and plugins.");
 	pf_modules_free();
 
-	pf_server_config_free(server->config);
+	pf_server_config_free(config);
 	pf_server_free(server);
 
 	WLog_INFO(TAG, "exiting.");
@@ -81,7 +82,6 @@ static BOOL is_all_required_modules_loaded(proxyConfig* config)
 
 int main(int argc, char* argv[])
 {
-	proxyConfig* config = NULL;
 	const char* config_path = "config.ini";
 	int status = -1;
 
