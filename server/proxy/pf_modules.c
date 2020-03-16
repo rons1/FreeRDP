@@ -160,14 +160,14 @@ static DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
 		if (!MessageQueue_Wait(pdata->queue))
 		{
 			WLog_ERR(TAG, "MessageQueue_Wait failed!");
-			error = ERROR_INTERNAL_ERROR;
+			rc = ERROR_INTERNAL_ERROR;
 			break;
 		}
 
 		if (!MessageQueue_Peek(pdata->queue, &message, TRUE))
 		{
 			WLog_ERR(TAG, "MessageQueue_Peek failed!");
-			error = ERROR_INTERNAL_ERROR;
+			rc = ERROR_INTERNAL_ERROR;
 			break;
 		}
 
