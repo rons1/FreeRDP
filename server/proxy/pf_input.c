@@ -79,7 +79,7 @@ static BOOL pf_server_mouse_event(rdpInput* input, UINT16 flags, UINT16 x, UINT1
 	if (pf_modules_run_filter(FILTER_TYPE_MOUSE, pc->pdata, &event))
 		return freerdp_input_send_mouse_event(pc->context.input, flags, x, y);
 
-	pf_modules_run_hook_async(HOOT_TYPE_ASYNC_MOUSE, pc->pdata, &event);
+	pf_modules_run_hook_async(HOOK_TYPE_ASYNC_MOUSE, pc->pdata, &event);
 	return TRUE;
 }
 
