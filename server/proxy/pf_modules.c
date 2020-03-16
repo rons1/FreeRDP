@@ -75,7 +75,7 @@ static BOOL pf_modules_is_hook_async(PF_HOOK_TYPE type)
 		case HOOK_TYPE_ASYNC_MOUSE:
 			return TRUE;
 		default:
-			return FALSE
+			return FALSE;
 	}
 }
 
