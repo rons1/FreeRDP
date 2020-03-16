@@ -149,7 +149,7 @@ void pf_modules_run_hook_async(PF_HOOK_TYPE type, proxyData* pdata, void* param)
 	MessageQueue_Dispatch(pdata->queue, &message);
 }
 
-static void DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
+static DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
 {
 	proxyData* pdata = (proxyData*)arg;
 	DWORD rc = 0;
