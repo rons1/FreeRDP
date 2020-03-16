@@ -28,7 +28,7 @@ static constexpr char plugin_desc[] = "this is a test plugin";
 
 static proxyPluginsManager* g_plugins_manager = NULL;
 
-static BOOL demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
+static void demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
 {
 	auto event_data = static_cast<proxyKeyboardEventInfo*>(param);
 	if (event_data == NULL)
@@ -37,25 +37,36 @@ static BOOL demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
 	std::cout << "Got async keyboard event: scan_code=" << event_data->rdp_scan_code << std::endl;
 }
 
+static void demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
+{
+	auto event_data = static_cast<proxyKeyboardEventInfo*>(param);
+	if (event_data == NULL)
+		return;
+
+	std::cout << "Got async mouse event: x=" << event_data->x << ", y=" << event_data->y
+	          << std::endl;
+}
+
 static BOOL demo_plugin_unload()
 {
 	std::cout << "C++ demo plugin: unloading..." << std::endl;
 	return TRUE;
 }
 
-static proxyPlugin demo_plugin = { plugin_name,        /* name */
-	                               plugin_desc,        /* description */
-	                               demo_plugin_unload, /* PluginUnload */
-	                               NULL,               /* ClientPreConnect */
-	                               NULL,               /* ClientLoginFailure */
-	                               NULL,               /* ServerPostConnect */
-	                               NULL,               /* ServerChannelsInit */
-	                               NULL,               /* ServerChannelsFree */
-	                               NULL,               /* KeyboardEvent */
-	                               NULL,               /* MouseEvent */
-	                               NULL,               /* ClientChannelData */
-	                               NULL,               /* ServerChannelData */
-	                               demo_plugin_async_keyboard_event /* AsyncKeyboardEvent */ };
+static proxyPlugin demo_plugin = { plugin_name,                      /* name */
+	                               plugin_desc,                      /* description */
+	                               demo_plugin_unload,               /* PluginUnload */
+	                               NULL,                             /* ClientPreConnect */
+	                               NULL,                             /* ClientLoginFailure */
+	                               NULL,                             /* ServerPostConnect */
+	                               NULL,                             /* ServerChannelsInit */
+	                               NULL,                             /* ServerChannelsFree */
+	                               NULL,                             /* KeyboardEvent */
+	                               NULL,                             /* MouseEvent */
+	                               NULL,                             /* ClientChannelData */
+	                               NULL,                             /* ServerChannelData */
+	                               demo_plugin_async_keyboard_event, /* AsyncKeyboardEvent */
+	                               demo_plugin_async_mouse_event /* AsyncKeyboardEvent */ };
 
 BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)
 {

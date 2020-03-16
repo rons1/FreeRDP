@@ -67,6 +67,18 @@ static const char* pf_modules_get_hook_type_string(PF_HOOK_TYPE result)
 		return "HOOK_UNKNOWN";
 }
 
+static BOOL pf_modules_is_hook_async(PF_HOOK_TYPE type)
+{
+	switch (type)
+	{
+		case HOOK_TYPE_ASYNC_KEYBARD:
+		case HOOK_TYPE_ASYNC_MOUSE:
+			return TRUE;
+		default:
+			return FALSE
+	}
+}
+
 static BOOL pf_modules_run_hook_ex(PF_HOOK_TYPE type, proxyData* pdata, void* param)
 {
 	BOOL ok = TRUE;
@@ -137,13 +149,20 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
 
 void pf_modules_run_hook_async(PF_HOOK_TYPE type, proxyData* pdata, void* param)
 {
+	wMessage message;
+
+	if (!pf_modules_is_hook_async(type))
+	{
+		WLog_ERR(TAG, "hook type %d is not an async hook!");
+		return;
+	}
+
 	if (!pdata->queue)
 	{
 		LOG_ERR(TAG, pdata->ps, "pdata->queue is not initialized!");
 		return;
 	}
 
-	wMessage message;
 	message.context = pdata;
 	message.wParam = param;
 	message.id = (UINT32)type;
@@ -176,13 +195,12 @@ static DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
 		if (message.id == WMQ_QUIT)
 			break;
 
-		if (message.id == 0)
 		{
 			PF_HOOK_TYPE type = (PF_HOOK_TYPE)message.id;
 			void* param = message.wParam;
 
-			if (!pf_modules_run_hook_ex(type, pdata, param))
-				WLog_ERR(TAG, "pf_modules_execute_asysnc_hook failed!");
+			/* as we're executing an async hook, return value can be ignored */
+			pf_modules_run_hook_ex(type, pdata, param);
 		}
 	}
 
@@ -222,6 +240,8 @@ BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 	}
 
 	CloseHandle(pdata->async_hooks_thread);
+	MessageQueue_Free(queue);
+	pdata->queue = NULL;
 }
 
 /*
