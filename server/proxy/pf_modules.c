@@ -213,7 +213,7 @@ static BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 
 	if (WaitForSingleObject(pdata->async_hooks_thread, INFINITE) == WAIT_FAILED)
 	{
-		rc = GetLastError();
+		DWORD rc = GetLastError();
 		LOG_ERR(TAG, pdata->ps, "WaitForSingleObject failed with error %" PRIu32 "", rc);
 		return rc;
 	}
