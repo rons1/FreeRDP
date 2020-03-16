@@ -153,6 +153,7 @@ static DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
 {
 	proxyData* pdata = (proxyData*)arg;
 	DWORD rc = 0;
+	wMessage message;
 
 	while (TRUE)
 	{
