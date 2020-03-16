@@ -55,7 +55,7 @@ static proxyPlugin demo_plugin = { plugin_name,        /* name */
 	                               NULL,               /* MouseEvent */
 	                               NULL,               /* ClientChannelData */
 	                               NULL,               /* ServerChannelData */
-	                               demo_plugin_keyboard_event /* AsyncKeyboardEvent */ };
+	                               demo_plugin_async_keyboard_event /* AsyncKeyboardEvent */ };
 
 BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)
 {
