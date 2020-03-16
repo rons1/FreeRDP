@@ -207,7 +207,7 @@ BOOL pf_modules_async_hooks_init(proxyData* pdata)
 	return TRUE;
 }
 
-static BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
+BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 {
 	MessageQueue_PostQuit(pdata->queue, 0);
 
