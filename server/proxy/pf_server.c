@@ -175,7 +175,7 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	}
 
 	/* Start a proxy's client in it's own thread */
-	if (!(pdata->client_thread = CreatfoeThread(NULL, 0, pf_client_start, pc, 0, NULL)))
+	if (!(pdata->client_thread = CreateThread(NULL, 0, pf_client_start, pc, 0, NULL)))
 	{
 		LOG_ERR(TAG, ps, "failed to create client thread");
 		return FALSE;
