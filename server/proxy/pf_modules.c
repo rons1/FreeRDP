@@ -226,7 +226,7 @@ BOOL pf_modules_async_hooks_init(proxyData* pdata)
 	return TRUE;
 }
 
-BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
+void pf_modules_async_hooks_uninit(proxyData* pdata)
 {
 	MessageQueue_PostQuit(pdata->queue, 0);
 
@@ -234,7 +234,6 @@ BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 	{
 		DWORD rc = GetLastError();
 		LOG_ERR(TAG, pdata->ps, "WaitForSingleObject failed with error %" PRIu32 "", rc);
-		return rc;
 	}
 
 	CloseHandle(pdata->async_hooks_thread);

@@ -64,7 +64,7 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata);
 /* async hooks */
 void pf_modules_run_hook_async(PF_HOOK_TYPE type, proxyData* pdata, void* param);
 BOOL pf_modules_async_hooks_init(proxyData* pdata);
-BOOL pf_modules_async_hooks_uninit(proxyData* pdata);
+void pf_modules_async_hooks_uninit(proxyData* pdata);
 
 void pf_modules_free(void);
 
