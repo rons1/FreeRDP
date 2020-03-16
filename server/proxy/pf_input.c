@@ -43,10 +43,11 @@ static BOOL pf_server_keyboard_event(rdpInput* input, UINT16 flags, UINT16 code)
 	event.flags = flags;
 	event.rdp_scan_code = code;
 
+	pf_modules_run_hook_async(HOOK_TYPE_ASYNC_KEYBOARD, pc->pdata, &event);
+
 	if (pf_modules_run_filter(FILTER_TYPE_KEYBOARD, pc->pdata, &event))
 		return freerdp_input_send_keyboard_event(pc->context.input, flags, code);
 
-	pf_modules_run_hook_async(HOOK_TYPE_ASYNC_KEYBOARD, pc->pdata, &event);
 	return TRUE;
 }
 
@@ -76,10 +77,11 @@ static BOOL pf_server_mouse_event(rdpInput* input, UINT16 flags, UINT16 x, UINT1
 	event.x = x;
 	event.y = y;
 
+	pf_modules_run_hook_async(HOOK_TYPE_ASYNC_MOUSE, pc->pdata, &event);
+
 	if (pf_modules_run_filter(FILTER_TYPE_MOUSE, pc->pdata, &event))
 		return freerdp_input_send_mouse_event(pc->context.input, flags, x, y);
 
-	pf_modules_run_hook_async(HOOK_TYPE_ASYNC_MOUSE, pc->pdata, &event);
 	return TRUE;
 }
 
