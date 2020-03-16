@@ -209,7 +209,7 @@ BOOL pf_modules_async_hooks_init(proxyData* pdata)
 
 static BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 {
-	MessageQueue_PostQuit(pdata->queue);
+	MessageQueue_PostQuit(pdata->queue, 0);
 
 	if (WaitForSingleObject(pdata->async_hooks_thread, INFINITE) == WAIT_FAILED)
 	{
