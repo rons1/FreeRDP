@@ -113,12 +113,10 @@ static BOOL pf_modules_run_hook_ex(PF_HOOK_TYPE type, proxyData* pdata, void* pa
 
 			case HOOK_TYPE_ASYNC_KEYBOARD:
 				IFCALL(plugin->AsyncKeyboardEvent, pdata, param);
-				ok = TRUE;
 				break;
 
 			case HOOK_TYPE_ASYNC_MOUSE:
 				IFCALL(plugin->AsyncMouseEvent, pdata, param);
-				ok = TRUE;
 				break;
 
 			default:
