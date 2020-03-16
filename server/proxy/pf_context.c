@@ -24,6 +24,7 @@
 
 #include "pf_client.h"
 #include "pf_context.h"
+#include "pf_modules.h"
 
 static wHashTable* create_channel_ids_map()
 {
@@ -233,6 +234,12 @@ proxyData* proxy_data_new(void)
 		return NULL;
 	}
 
+	if (!pf_modules_async_hooks_init(pdata))
+	{
+		proxy_data_free(pdata);
+		return NULL;
+	}
+
 	/* modules_info maps between plugin name to custom data */
 	pdata->modules_info->hash = HashTable_StringHash;
 	pdata->modules_info->keyCompare = HashTable_StringCompare;
@@ -280,6 +287,8 @@ void proxy_data_free(proxyData* pdata)
 
 	if (pdata->modules_info)
 		HashTable_Free(pdata->modules_info);
+
+	pf_modules_async_hooks_uninit(pdata);
 
 	free(pdata);
 }

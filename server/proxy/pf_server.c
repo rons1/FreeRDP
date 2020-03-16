@@ -300,9 +300,6 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 	server_receive_channel_data_original = peer->ReceiveChannelData;
 	peer->ReceiveChannelData = pf_server_receive_channel_data_hook;
 
-	if (!pf_modules_async_hooks_init(pdata))
-		return FALSE;
-
 	if (ArrayList_Add(server->clients, pdata) < 0)
 		return FALSE;
 
@@ -423,7 +420,6 @@ fail:
 	pf_server_channels_free(ps);
 	LOG_INFO(TAG, ps, "freeing proxy data");
 	ArrayList_Remove(server->clients, pdata);
-	pf_modules_async_hooks_uninit(pdata);
 	proxy_data_free(pdata);
 	freerdp_client_context_free(pc);
 	client->Close(client);
