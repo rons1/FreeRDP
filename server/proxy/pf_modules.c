@@ -71,7 +71,7 @@ static BOOL pf_modules_is_hook_async(PF_HOOK_TYPE type)
 {
 	switch (type)
 	{
-		case HOOK_TYPE_ASYNC_KEYBARD:
+		case HOOK_TYPE_ASYNC_KEYBOARD:
 		case HOOK_TYPE_ASYNC_MOUSE:
 			return TRUE;
 		default:
@@ -240,7 +240,7 @@ BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
 	}
 
 	CloseHandle(pdata->async_hooks_thread);
-	MessageQueue_Free(queue);
+	MessageQueue_Free(pdata->queue);
 	pdata->queue = NULL;
 }
 
