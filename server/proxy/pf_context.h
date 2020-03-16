@@ -110,11 +110,13 @@ struct proxy_data
 	HANDLE abort_event;
 	HANDLE client_thread;
 	HANDLE gfx_server_ready;
+	HANDLE async_hooks_thread;
 
 	char* session_id;
 
 	/* used to external modules to store per-session info */
 	wHashTable* modules_info;
+	wMessageQueue* queue;
 };
 
 BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src);

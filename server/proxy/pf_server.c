@@ -175,7 +175,7 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	}
 
 	/* Start a proxy's client in it's own thread */
-	if (!(pdata->client_thread = CreateThread(NULL, 0, pf_client_start, pc, 0, NULL)))
+	if (!(pdata->client_thread = CreatfoeThread(NULL, 0, pf_client_start, pc, 0, NULL)))
 	{
 		LOG_ERR(TAG, ps, "failed to create client thread");
 		return FALSE;
@@ -183,6 +183,7 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 
 	pf_server_register_input_callbacks(peer->input);
 	pf_server_register_update_callbacks(peer->update);
+
 	return pf_modules_run_hook(HOOK_TYPE_SERVER_POST_CONNECT, pdata);
 }
 
@@ -298,6 +299,9 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 	/* virtual channels receive data hook */
 	server_receive_channel_data_original = peer->ReceiveChannelData;
 	peer->ReceiveChannelData = pf_server_receive_channel_data_hook;
+
+	if (!pf_modules_async_hooks_init(pdata))
+		return FALSE;
 
 	if (ArrayList_Add(server->clients, pdata) < 0)
 		return FALSE;
@@ -419,6 +423,7 @@ fail:
 	pf_server_channels_free(ps);
 	LOG_INFO(TAG, ps, "freeing proxy data");
 	ArrayList_Remove(server->clients, pdata);
+	pf_modules_async_hooks_uninit(pdata);
 	proxy_data_free(pdata);
 	freerdp_client_context_free(pc);
 	client->Close(client);

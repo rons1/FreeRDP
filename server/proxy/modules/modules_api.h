@@ -37,6 +37,7 @@ typedef BOOL (*proxyHookFn)(proxyData*);
  * 	or FALSE if it should be ignored.
  */
 typedef BOOL (*proxyFilterFn)(proxyData*, void*);
+typedef void (*proxyAsyncHookFn)(proxyData*, void*);
 
 /* describes a plugin: name, description and callbacks to execute. */
 typedef struct proxy_plugin
@@ -58,6 +59,10 @@ typedef struct proxy_plugin
 	proxyFilterFn MouseEvent;
 	proxyFilterFn ClientChannelData; /* passthrough channels data */
 	proxyFilterFn ServerChannelData; /* passthrough channels data */
+
+	/* async hooks */
+	proxyAsyncHookFn AsyncKeyboardEvent;
+	proxyAsyncHookFn AsyncMouseEvent;
 } proxyPlugin;
 
 /*

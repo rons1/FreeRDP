@@ -67,13 +67,7 @@ static const char* pf_modules_get_hook_type_string(PF_HOOK_TYPE result)
 		return "HOOK_UNKNOWN";
 }
 
-/*
- * runs all hooks of type `type`.
- *
- * @type: hook type to run.
- * @server: pointer of server's rdpContext struct of the current session.
- */
-BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
+static BOOL pf_modules_run_hook_ex(PF_HOOK_TYPE type, proxyData* pdata, void* param)
 {
 	BOOL ok = TRUE;
 	int index;
@@ -105,6 +99,14 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
 				IFCALLRET(plugin->ServerChannelsFree, ok, pdata);
 				break;
 
+			case HOOK_TYPE_ASYNC_KEYBOARD:
+				IFCALLRET(plugin->AsyncKeyboardEvent, ok, pdata, param);
+				break;
+
+			case HOOK_TYPE_ASYNC_MOUSE:
+				IFCALLRET(plugin->AsyncMouseEvent, ok, pdata, param);
+				break;
+
 			default:
 				WLog_ERR(TAG, "invalid hook called");
 		}
@@ -118,6 +120,105 @@ BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
 	}
 
 	return TRUE;
+}
+
+/*
+ * runs all hooks of type `type`.
+ *
+ * @type: hook type to run.
+ * @server: pointer of server's rdpContext struct of the current session.
+ */
+BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata)
+{
+	return pf_modules_run_hook_ex(type, pdata, NULL);
+}
+
+void pf_modules_run_hook_async(PF_HOOK_TYPE type, proxyData* pdata, void* param)
+{
+	if (!pdata->queue)
+	{
+		LOG_ERR(TAG, pdata->ps, "pdata->queue is not initialized!");
+		return;
+	}
+
+	wMessage message;
+	message.context = pdata;
+	message.wParam = param;
+	message.id = (UINT32)type;
+
+	MessageQueue_Dispatch(pdata->queue, &message);
+}
+
+static void DWORD WINAPI pf_modules_async_hooks_thread(LPVOID arg)
+{
+	proxyData* pdata = (proxyData*)arg;
+	DWORD rc = 0;
+
+	while (TRUE)
+	{
+		if (!MessageQueue_Wait(pdata->queue))
+		{
+			WLog_ERR(TAG, "MessageQueue_Wait failed!");
+			error = ERROR_INTERNAL_ERROR;
+			break;
+		}
+
+		if (!MessageQueue_Peek(pdata->queue, &message, TRUE))
+		{
+			WLog_ERR(TAG, "MessageQueue_Peek failed!");
+			error = ERROR_INTERNAL_ERROR;
+			break;
+		}
+
+		if (message.id == WMQ_QUIT)
+			break;
+
+		if (message.id == 0)
+		{
+			PF_HOOK_TYPE type = (PF_HOOK_TYPE)message.id;
+			void* param = message.wParam;
+
+			if (!pf_modules_run_hook_ex(type, pdata, param))
+				WLog_ERR(TAG, "pf_modules_execute_asysnc_hook failed!");
+		}
+	}
+
+	ExitThread(rc);
+	return rc;
+}
+
+BOOL pf_modules_async_hooks_init(proxyData* pdata)
+{
+	wMessageQueue* queue = MessageQueue_New(NULL);
+	if (!queue)
+		return FALSE;
+
+	pdata->queue = queue;
+
+	if (!(pdata->async_hooks_thread =
+	          CreateThread(NULL, 0, pf_modules_async_hooks_thread, (void*)pdata, 0, NULL)))
+	{
+		LOG_ERR(TAG, pdata->ps, "CreateThread failed!");
+		MessageQueue_Free(queue);
+		pdata->queue = NULL;
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static BOOL pf_modules_async_hooks_uninit(proxyData* pdata)
+{
+	MessageQueue_PostQuit(pdata->queue);
+
+	if (WaitForSingleObject(pdata->async_hooks_thread, INFINITE) == WAIT_FAILED)
+	{
+		rc = GetLastError();
+		LOG_ERR(TAG, pdata->ps, "WaitForSingleObject failed with error %" PRIu32 "", rc);
+		return rc;
+	}
+
+	CloseHandle(pdata->async_hooks_thread);
 }
 
 /*
@@ -178,7 +279,8 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
  */
 static BOOL pf_modules_set_plugin_data(const char* plugin_name, proxyData* pdata, void* data)
 {
-	union {
+	union
+	{
 		const char* ccp;
 		char* cp;
 	} ccharconv;
@@ -207,7 +309,8 @@ static BOOL pf_modules_set_plugin_data(const char* plugin_name, proxyData* pdata
  */
 static void* pf_modules_get_plugin_data(const char* plugin_name, proxyData* pdata)
 {
-	union {
+	union
+	{
 		const char* ccp;
 		char* cp;
 	} ccharconv;

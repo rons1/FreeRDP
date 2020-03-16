@@ -47,6 +47,9 @@ enum _PF_HOOK_TYPE
 	HOOK_TYPE_SERVER_CHANNELS_INIT,
 	HOOK_TYPE_SERVER_CHANNELS_FREE,
 
+	HOOK_TYPE_ASYNC_KEYBOARD,
+	HOOT_TYPE_ASYNC_MOUSE,
+
 	HOOK_LAST
 };
 
@@ -54,8 +57,14 @@ BOOL pf_modules_init(const char* root_dir, const char** modules, size_t count);
 BOOL pf_modules_is_plugin_loaded(const char* plugin_name);
 void pf_modules_list_loaded_plugins(void);
 
+/* synchronous filters and hooks */
 BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param);
 BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata);
+
+/* async hooks */
+void pf_modules_run_hook_async(PF_HOOK_TYPE type, proxyData* pdata, void* param);
+BOOL pf_modules_async_hooks_init(proxyData* pdata);
+BOOL pf_modules_async_hooks_uninit(proxyData* pdata);
 
 void pf_modules_free(void);
 
