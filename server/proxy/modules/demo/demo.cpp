@@ -37,9 +37,9 @@ static void demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
 	std::cout << "Got async keyboard event: scan_code=" << event_data->rdp_scan_code << std::endl;
 }
 
-static void demo_plugin_async_keyboard_event(proxyData* pdata, void* param)
+static void demo_plugin_async_mouse_event(proxyData* pdata, void* param)
 {
-	auto event_data = static_cast<proxyKeyboardEventInfo*>(param);
+	auto event_data = static_cast<proxyMouseEventInfo*>(param);
 	if (event_data == NULL)
 		return;
 
