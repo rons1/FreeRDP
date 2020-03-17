@@ -107,6 +107,7 @@ static BOOL pf_capture_create_current_session_captures_dir(pClientContext* pc)
 
 error:
 	free(pc->frames_dir);
+	pc->frames_dir = NULL;
 	return FALSE;
 }
 

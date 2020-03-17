@@ -411,6 +411,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 
 fail:
 
+	EnterCriticalSection(&pdata->lock);
 	pc = (rdpContext*)pdata->pc;
 	LOG_INFO(TAG, ps, "starting shutdown of connection");
 	LOG_INFO(TAG, ps, "stopping proxy's client");
@@ -419,8 +420,9 @@ fail:
 	pf_server_channels_free(ps);
 	LOG_INFO(TAG, ps, "freeing proxy data");
 	ArrayList_Remove(server->clients, pdata);
-	proxy_data_free(pdata);
 	freerdp_client_context_free(pc);
+	LeaveCriticalSection(&pdata->lock);
+	proxy_data_free(pdata);
 	client->Close(client);
 	client->Disconnect(client);
 out_free_peer:
