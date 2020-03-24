@@ -114,6 +114,12 @@ static BOOL pf_config_load_server(wIniFile* ini, proxyConfig* config)
 	if (!pf_config_get_uint16(ini, "Server", "Port", &config->Port))
 		return FALSE;
 
+	if (config->Port == 0)
+	{
+		WLog_WARN(TAG, "config.Port invalid, defaults to 3389");
+		config->Port = 3389;
+	}
+
 	host = pf_config_get_str(ini, "Server", "Host");
 
 	if (!host)
@@ -133,6 +139,12 @@ static BOOL pf_config_load_target(wIniFile* ini, proxyConfig* config)
 
 	if (!pf_config_get_uint16(ini, "Target", "Port", &config->TargetPort))
 		return FALSE;
+
+	if (config->TargetPort == 0)
+	{
+		WLog_WARN(TAG, "config.TargetPort invalid, defaults to 3389");
+		config->TargetPort = 3389;
+	}
 
 	target_host = pf_config_get_str(ini, "Target", "Host");
 
