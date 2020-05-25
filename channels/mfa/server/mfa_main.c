@@ -81,14 +81,14 @@ static BOOL mfa_set_waitable_timer(MfaServerContext* context)
 	now = FileTime_to_POSIX(&fileTime);
 	diff = context->token_exp - now;
 
-	WLog_INFO(TAG, "mfa_set_waitable_timer: now: %ld, exp: %ld, diff: %ld sec", now,
-	          context->token_exp, diff);
-
-	if (now >= context->token_exp)
+	if (diff <= 0)
 	{
 		WLog_ERR(TAG, "mfa_set_waitable_timer: now >= token_exp");
 		return FALSE;
 	}
+
+	WLog_INFO(TAG, "mfa_set_waitable_timer: now: %ld, exp: %ld, diff: %ld sec", now,
+	          context->token_exp, diff);
 
 	due.QuadPart = -10000000LL * diff; /* WinApi is the best! */
 	return SetWaitableTimer(mfa->timer, &due, 0, mfa_token_expired_cb, context, 0);
