@@ -263,7 +263,7 @@ static BOOL fetch_openid_configuration(TokenValidator* tv, const char* adfs_base
 }
 
 TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_audience,
-                                     INT64 token_skew_minutes, BOOL insecure_ssl)
+                                     UINT32 token_skew_minutes, BOOL insecure_ssl)
 {
 	if (NULL == adfs_base_url || NULL == app_audience)
 	{
@@ -432,15 +432,18 @@ static BOOL token_validator_verify_signature(TokenValidator* tv, cjose_jws_t* to
 	return FALSE;
 }
 
-static BOOL validate_token_skew(INT64 token_creation_time, INT64 token_skew_minutes)
+static BOOL validate_token_skew(INT64 token_creation_time, UINT32 token_skew_minutes)
 {
 	INT64 now;
 	FILETIME fileTime;
+	UINT64 token_invalid_time;
 
 	GetSystemTimeAsFileTime(&fileTime);
 	now = FileTime_to_POSIX(&fileTime);
 
-	if ((now - token_creation_time) > (1000 * 60 * token_skew_minutes))
+	token_invalid_time = 1000 * 60 * (UINT64)token_skew_minutes;
+
+	if ((now - token_creation_time) >= token_invalid_time)
 	{
 		WLog_WARN(TAG, "token_validator_validate_token_skew: token is too old and can't be used!");
 		return FALSE;
