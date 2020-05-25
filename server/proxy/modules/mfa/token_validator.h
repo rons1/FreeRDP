@@ -50,7 +50,7 @@ struct token_validator
 	char* jwks_uri;
 	char* audience;
 	BOOL ssl_verify_peer;
-	INT64 token_skew_minutes;
+	UINT32 token_skew_minutes;
 	wHashTable* used_tokens;
 };
 
@@ -58,11 +58,11 @@ struct token_response_t
 {
 	verificationResult verification_result;
 	char nonce[NONCE_LENGTH + 1];
-	INT64 exp;
+	UINT64 exp;
 };
 
 TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_audience,
-                                     INT64 token_skew_minutes, BOOL insecure_ssl);
+                                     UINT32 token_skew_minutes, BOOL insecure_ssl);
 
 struct token_response_t token_validator_validate_token(TokenValidator* tv,
                                                        const char* compact_token,
