@@ -314,6 +314,30 @@ static BOOL mfa_handle_keyboard_and_mouse_event(proxyData* pdata, void* param)
 	return TRUE;
 }
 
+static BOOL mfa_config_fetch_uint32(wIniFile* file, const char* section, const char* key,
+                                    UINT32* out)
+{
+	int tmp;
+
+	if (!section || !key)
+		return FALSE;
+
+	if (!out)
+		return FALSE;
+
+	tmp = IniFile_GetKeyValueInt(file, section, key);
+	if (tmp <= 0)
+	{
+		WLog_ERR(TAG, "config value for '%s.%s' is invalid. expected positive integer, got %d",
+		         section, key, tmp);
+		*out = 0;
+		return FALSE;
+	}
+
+	*out = (UINT32)tmp;
+	return TRUE;
+}
+
 static BOOL mfa_config_load()
 {
 	BOOL ok = FALSE;
@@ -334,9 +358,15 @@ static BOOL mfa_config_load()
 	config.mfa_adfs_base_url = _strdup(pf_config_get_str(ini, "MFA", "AdfsBaseUrl"));
 	config.mfa_audience = _strdup(pf_config_get_str(ini, "MFA", "Audience"));
 	config.insecure_ssl = pf_config_get_bool(ini, "MFA", "InsecureSSL");
-	config.token_skew_minutes = IniFile_GetKeyValueInt(ini, "MFA", "TokenSkewMinutes");
-	config.auth_timeout_sec = IniFile_GetKeyValueInt(ini, "MFA", "WaitTimeoutSec");
-	config.refresh_token_interval = IniFile_GetKeyValueInt(ini, "MFA", "RefreshTokenIntervalSec");
+
+	if (!mfa_config_fetch_uint32(ini, "MFA", "TokenSkewMinutes", &config.token_skew_minutes))
+		goto out;
+	if (!mfa_config_fetch_uint32(ini, "MFA", "WaitTimeoutSec", &config.auth_timeout_sec))
+		goto out;
+	if (!mfa_config_fetch_uint32(ini, "MFA", "RefreshTokenIntervalSec",
+	                             &config.refresh_token_interval))
+		goto out;
+
 	ok = TRUE;
 
 out:

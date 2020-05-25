@@ -35,9 +35,9 @@ typedef struct mfa_module_config
 	char* mfa_adfs_base_url;
 	char* mfa_audience;
 	BOOL insecure_ssl;
-	INT64 token_skew_minutes;
-	INT64 auth_timeout_sec;
-	INT64 refresh_token_interval;
+	UINT32 token_skew_minutes;
+	UINT32 auth_timeout_sec;
+	UINT32 refresh_token_interval;
 } mfaConfig;
 
 typedef struct mfa_session
