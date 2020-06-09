@@ -265,13 +265,14 @@ static BOOL fetch_openid_configuration(TokenValidator* tv, const char* adfs_base
 TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_audience,
                                      UINT32 token_skew_minutes, BOOL insecure_ssl)
 {
+	TokenValidator* tv = NULL;
 	if (NULL == adfs_base_url || NULL == app_audience)
 	{
 		WLog_ERR(TAG, "token_validator_init: bad parameters");
 		return NULL;
 	}
 
-	TokenValidator* tv = calloc(1, sizeof(TokenValidator));
+	tv = calloc(1, sizeof(TokenValidator));
 	if (NULL == tv)
 	{
 		WLog_ERR(TAG, "token_validator_init: calloc failed!");
@@ -283,15 +284,13 @@ TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_
 	if (!fetch_openid_configuration(tv, adfs_base_url))
 	{
 		WLog_ERR(TAG, "fetch_openid_configuration failed");
-		free(tv);
-		return NULL;
+		goto error;
 	}
 
 	if (!fetch_jwks(tv))
 	{
 		WLog_ERR(TAG, "fetch_jwks failed");
-		free(tv);
-		return NULL;
+		goto error;
 	}
 
 	/* create thread-safe hash table */
@@ -299,8 +298,7 @@ TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_
 	if (!tv->used_tokens)
 	{
 		WLog_ERR(TAG, "HashTable_New failed!");
-		free(tv);
-		return NULL;
+		goto error;
 	}
 
 	/* used_tokens is a hash table whose keys are strings.
@@ -314,6 +312,10 @@ TokenValidator* token_validator_init(const char* adfs_base_url, const char* app_
 	tv->audience = _strdup(app_audience);
 	tv->token_skew_minutes = token_skew_minutes;
 	return tv;
+
+error:
+	token_validator_free(tv);
+	return NULL;
 }
 
 void token_validator_free(TokenValidator* tv)
@@ -321,25 +323,18 @@ void token_validator_free(TokenValidator* tv)
 	if (NULL == tv)
 		return;
 
-	/* hash table (used tokens) */
 	HashTable_Free(tv->used_tokens);
 
-	/* free jwks_uri */
 	free(tv->jwks_uri);
-
-	/* free issuer */
 	free(tv->issuer);
 
-	/* free jwk tokens */
 	for (int i = 0; i < MAX_JWK_ARRAY_SZ; i++)
 	{
 		cjose_jwk_release(tv->jwk_array[i]);
 		tv->jwk_array[i] = NULL;
 	}
 
-	/* free audience */
 	free(tv->audience);
-
 	free(tv);
 }
 
@@ -360,7 +355,6 @@ static BOOL validate_token_claim(json_t* token, const char* claim_name,
 		return FALSE;
 	}
 
-	/* valid claim! */
 	return TRUE;
 }
 
@@ -397,9 +391,9 @@ static BOOL validate_token_domain_admins_relation(json_t* token, const char* dom
 	temp = json_object_get(token, TOKEN_CLAIM_SAM_ACCOUNT_NAME);
 	username = json_string_value(temp);
 	WLog_ERR(TAG,
-	         "validate_token_domain_admins_relation: The username: %s is trying to connect with "
+	         "%s: The username: %s is trying to connect with "
 	         "domain admin: %s that doesn't belong to him",
-	         username, domain_admin);
+	         __FUNCTION__, username, domain_admin);
 	return FALSE;
 }
 
@@ -434,18 +428,25 @@ static BOOL token_validator_verify_signature(TokenValidator* tv, cjose_jws_t* to
 
 static BOOL validate_token_skew(INT64 token_creation_time, UINT32 token_skew_minutes)
 {
-	INT64 now;
+	INT64 now_time;
+	INT64 expiry_date;
 	FILETIME fileTime;
-	UINT64 token_invalid_time;
 
 	GetSystemTimeAsFileTime(&fileTime);
-	now = FileTime_to_POSIX(&fileTime);
+	now_time = FileTime_to_POSIX(&fileTime);
 
-	token_invalid_time = 1000 * 60 * (UINT64)token_skew_minutes;
+	expiry_date = 1000 * 60 * token_skew_minutes;
 
-	if ((now - token_creation_time) >= token_invalid_time)
+	if (now_time < token_creation_time)
 	{
-		WLog_WARN(TAG, "token_validator_validate_token_skew: token is too old and can't be used!");
+		printf("now: %ld, created at: %ld\n", now_time, token_creation_time);
+		WLog_WARN(TAG, "%s: now < expired, time might be out of sync!", __FUNCTION__);
+		return FALSE;
+	}
+
+	if ((now_time - token_creation_time) >= expiry_date)
+	{
+		WLog_WARN(TAG, "%s: token is too old and can't be used!", __FUNCTION__);
 		return FALSE;
 	}
 
