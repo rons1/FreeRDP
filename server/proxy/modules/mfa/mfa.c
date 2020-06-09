@@ -28,7 +28,7 @@ static proxyPluginsManager* g_plugins_manager = NULL;
 
 static mfaConfig config = { 0 };
 
-static BOOL mfa_update_idle_timer(proxyData* pdata);
+static BOOL mfa_update_idle_timer(proxyData* pdata, MfaServerContext* mfa);
 
 static void mfa_session_free(mfaSession* session)
 {
@@ -78,7 +78,8 @@ static BOOL mfa_block_until_auth(MfaServerContext* mfa)
 	waitHandles[0] = session->auth;
 	waitHandles[1] = pdata->abort_event;
 
-	switch (WaitForMultipleObjects(2, waitHandles, FALSE, config.auth_timeout_sec * 1000))
+	switch (WaitForMultipleObjects(ARRAYSIZE(waitHandles), waitHandles, FALSE,
+	                               config.auth_timeout_sec * 1000))
 	{
 		case WAIT_FAILED:
 			WLog_ERR(TAG, "[%s]: wait failed", __FUNCTION__);
@@ -184,16 +185,21 @@ static BOOL mfa_auth_result(MfaServerContext* context, MFA_STATUS result)
 	{
 		case MFA_STATUS_AUTHENTICATED:
 			/* reset idle timer */
-			mfa_update_idle_timer(session->pdata);
+			mfa_update_idle_timer(pdata, context);
 
 			SetEvent(session->auth);
 			return context->ServerTokenResponse(context, MFA_FLAG_OK);
-			break;
+
 		case MFA_STATUS_AUTH_FAIL:
-			return context->ServerTokenResponse(context, MFA_FLAG_FAIL);
-			break;
+		{
+			BOOL rc = context->ServerTokenResponse(context, MFA_FLAG_FAIL);
+			mfa_abort_connect(context);
+			return rc;
+		}
+
 		case MFA_STATUS_AUTH_TIMEOUT:
 			return context->ServerTokenResponse(context, MFA_FLAG_TIMEOUT);
+
 		default:
 			WLog_ERR(TAG, "auth result: unknown result %d", result);
 			return FALSE;
@@ -258,6 +264,7 @@ static BOOL mfa_free_channel(proxyData* pdata)
 
 	return TRUE;
 }
+
 static void CALLBACK mfa_session_idle_event(LPVOID lpArg, DWORD dwTimerLowValue,
                                             DWORD dwTimerHighValue)
 {
@@ -279,20 +286,19 @@ static void CALLBACK mfa_session_idle_event(LPVOID lpArg, DWORD dwTimerLowValue,
 	mfa->ForceRefreshToken(mfa);
 }
 
-static BOOL mfa_update_idle_timer(proxyData* pdata)
+static BOOL mfa_update_idle_timer(proxyData* pdata, MfaServerContext* mfa)
 {
-	MfaServerContext* mfa;
+	LARGE_INTEGER due = { 0 };
 	mfaSession* session;
-	LARGE_INTEGER due;
 
-	mfa = g_plugins_manager->GetPluginData(PLUGIN_NAME, pdata);
-	if (!mfa)
+	if (!pdata || !mfa)
 		return FALSE;
 
 	session = (mfaSession*)mfa->custom;
+	due.QuadPart = -10000000LL * config.refresh_token_interval;
 
-	due.QuadPart = -1 * config.refresh_token_interval * 10000000;
-	LOG_DBG(TAG, session->pdata->ps, "reset refresh token timer");
+	LOG_DBG(TAG, pdata->ps, "reset refresh token timer, due: %ld, refresh: %ld", due.QuadPart,
+	        config.refresh_token_interval);
 
 	return SetWaitableTimer(session->idle_timer, // Handle to the timer object.
 	                        &due,                // When timer will become signaled.
@@ -305,36 +311,12 @@ static BOOL mfa_update_idle_timer(proxyData* pdata)
 static BOOL mfa_handle_keyboard_and_mouse_event(proxyData* pdata, void* param)
 {
 	MfaServerContext* mfa = g_plugins_manager->GetPluginData(PLUGIN_NAME, pdata);
-	mfa_update_idle_timer(pdata);
+	mfa_update_idle_timer(pdata, mfa);
 
 	/* Only allow mouse and keyboard events to be proxied if session is authenticated */
 	if (mfa->GetStatus(mfa) != MFA_STATUS_AUTHENTICATED)
 		return FALSE;
 
-	return TRUE;
-}
-
-static BOOL mfa_config_fetch_uint32(wIniFile* file, const char* section, const char* key,
-                                    UINT32* out)
-{
-	int tmp;
-
-	if (!section || !key)
-		return FALSE;
-
-	if (!out)
-		return FALSE;
-
-	tmp = IniFile_GetKeyValueInt(file, section, key);
-	if (tmp <= 0)
-	{
-		WLog_ERR(TAG, "config value for '%s.%s' is invalid. expected positive integer, got %d",
-		         section, key, tmp);
-		*out = 0;
-		return FALSE;
-	}
-
-	*out = (UINT32)tmp;
 	return TRUE;
 }
 
@@ -359,12 +341,12 @@ static BOOL mfa_config_load()
 	config.mfa_audience = _strdup(pf_config_get_str(ini, "MFA", "Audience"));
 	config.insecure_ssl = pf_config_get_bool(ini, "MFA", "InsecureSSL");
 
-	if (!mfa_config_fetch_uint32(ini, "MFA", "TokenSkewMinutes", &config.token_skew_minutes))
+	if (!pf_config_get_uint32(ini, "MFA", "TokenSkewMinutes", &config.token_skew_minutes))
 		goto out;
-	if (!mfa_config_fetch_uint32(ini, "MFA", "WaitTimeoutSec", &config.auth_timeout_sec))
+	if (!pf_config_get_uint32(ini, "MFA", "WaitTimeoutSec", &config.auth_timeout_sec))
 		goto out;
-	if (!mfa_config_fetch_uint32(ini, "MFA", "RefreshTokenIntervalSec",
-	                             &config.refresh_token_interval))
+	if (!pf_config_get_uint32(ini, "MFA", "RefreshTokenIntervalSec",
+	                          &config.refresh_token_interval))
 		goto out;
 
 	ok = TRUE;
@@ -433,6 +415,6 @@ BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)
 	return TRUE;
 error:
 	token_validator_free(g_token_validator);
-	mfa_config_free(config);
+	mfa_config_free();
 	return FALSE;
 }
