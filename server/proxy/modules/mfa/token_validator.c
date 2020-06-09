@@ -431,7 +431,6 @@ static BOOL validate_token_skew(INT64 token_creation_time, UINT32 token_skew_min
 	INT64 now_time;
 	INT64 expiry_date;
 	FILETIME fileTime;
-	UINT64 token_invalid_time;
 
 	GetSystemTimeAsFileTime(&fileTime);
 	now_time = FileTime_to_POSIX(&fileTime);

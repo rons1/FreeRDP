@@ -320,30 +320,6 @@ static BOOL mfa_handle_keyboard_and_mouse_event(proxyData* pdata, void* param)
 	return TRUE;
 }
 
-static BOOL mfa_config_fetch_uint32(wIniFile* file, const char* section, const char* key,
-                                    UINT32* out)
-{
-	int tmp;
-
-	if (!section || !key)
-		return FALSE;
-
-	if (!out)
-		return FALSE;
-
-	tmp = IniFile_GetKeyValueInt(file, section, key);
-	if (tmp <= 0)
-	{
-		WLog_ERR(TAG, "config value for '%s.%s' is invalid. expected positive integer, got %d",
-		         section, key, tmp);
-		*out = 0;
-		return FALSE;
-	}
-
-	*out = (UINT32)tmp;
-	return TRUE;
-}
-
 static BOOL mfa_config_load()
 {
 	BOOL ok = FALSE;
