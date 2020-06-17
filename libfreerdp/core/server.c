@@ -485,7 +485,7 @@ BOOL WTSVirtualChannelManagerCheckFileDescriptor(HANDLE hServer)
 		buffer = (BYTE*)message.wParam;
 		length = (UINT32)(UINT_PTR)message.lParam;
 
-		if (!vcm->client->SendChannelData(vcm->client, channelId, buffer, length))
+		if (!vcm->client->SendChannelData(vcm->client, channelId, buffer, length, -1))
 		{
 			status = FALSE;
 		}

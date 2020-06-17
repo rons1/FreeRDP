@@ -946,10 +946,7 @@ static int freerdp_client_command_line_post_filter(void* context, COMMAND_LINE_A
 		size_t count;
 		p = CommandLineParseCommaSeparatedValuesEx("rdpsnd", arg->Value, &count);
 		status = freerdp_client_add_static_channel(settings, count, p);
-		if (status)
-		{
-			status = freerdp_client_add_dynamic_channel(settings, count, p);
-		}
+
 		free(p);
 	}
 	CommandLineSwitchCase(arg, "microphone")
@@ -3572,13 +3569,7 @@ BOOL freerdp_client_load_addins(rdpChannels* channels, rdpSettings* settings)
 		if (!freerdp_static_channel_collection_find(settings, "rdpsnd") &&
 		    !freerdp_dynamic_channel_collection_find(settings, "rdpsnd"))
 		{
-			char* params[2];
-			params[0] = "rdpsnd";
-			params[1] = "sys:fake";
-
-			if (!freerdp_client_add_static_channel(settings, 2, (char**)params))
-				return FALSE;
-		}
+				}
 	}
 
 	if (settings->RedirectSmartCards)

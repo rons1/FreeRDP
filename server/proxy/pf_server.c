@@ -205,18 +205,27 @@ static BOOL pf_server_receive_channel_data_hook(freerdp_peer* peer, UINT16 chann
 	size_t i;
 	const char* channel_name = WTSChannelGetName(peer, channelId);
 
+	printf("server: %d client %d\n", ps->context.settings->VirtualChannelChunkSize,
+	       pc->context.settings->VirtualChannelChunkSize);
+
 	/*
 	 * client side is not initialized yet, call original callback.
 	 * this is probably a drdynvc message between peer and proxy server,
 	 * which doesn't need to be proxied.
 	 */
 	if (!pc)
+	{
+		printf("shit: %s\n", channel_name);
 		goto original_cb;
+	}
 
 	for (i = 0; i < config->PassthroughCount; i++)
 	{
+		printf("here, checking %s == %s\n", channel_name, config->Passthrough[i]);
+
 		if (strncmp(channel_name, config->Passthrough[i], CHANNEL_NAME_LEN) == 0)
 		{
+			printf("jhasdfadsf\n");
 			proxyChannelDataEventInfo ev;
 			UINT64 client_channel_id;
 
@@ -225,13 +234,12 @@ static BOOL pf_server_receive_channel_data_hook(freerdp_peer* peer, UINT16 chann
 			ev.data = data;
 			ev.data_len = size;
 
-			if (!pf_modules_run_filter(FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA, pdata, &ev))
-				return FALSE;
-
 			client_channel_id = (UINT64)HashTable_GetItemValue(pc->vc_ids, (void*)channel_name);
 
-			return pc->context.instance->SendChannelData(pc->context.instance,
-			                                             (UINT16)client_channel_id, data, size);
+			printf("sending data on channel %s using channel id %d\n", channel_name,
+			       client_channel_id);
+			return pc->context.instance->SendChannelData(
+			    pc->context.instance, (UINT16)client_channel_id, data, size, flags);
 		}
 	}
 
@@ -294,6 +302,7 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 	settings->SuppressOutput = TRUE;
 	settings->RefreshRect = TRUE;
 	settings->DesktopResize = TRUE;
+	settings->AudioPlayback = TRUE;
 
 	peer->PostConnect = pf_server_post_connect;
 	peer->Activate = pf_server_activate;

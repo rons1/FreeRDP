@@ -641,9 +641,6 @@ static BOOL rdp_write_info_packet(rdpRdp* rdp, wStream* s)
 	if (settings->AudioCapture)
 		flags |= INFO_AUDIOCAPTURE;
 
-	if (!settings->AudioPlayback)
-		flags |= INFO_NOAUDIOPLAYBACK;
-
 	if (settings->VideoDisable)
 		flags |= INFO_VIDEO_DISABLE;
 

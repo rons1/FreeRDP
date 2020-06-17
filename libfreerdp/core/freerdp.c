@@ -489,9 +489,9 @@ int freerdp_message_queue_process_pending_messages(freerdp* instance, DWORD id)
 }
 
 static BOOL freerdp_send_channel_data(freerdp* instance, UINT16 channelId, const BYTE* data,
-                                      size_t size)
+                                      size_t size, INT32 flags)
 {
-	return rdp_send_channel_data(instance->context->rdp, channelId, data, size);
+	return rdp_send_channel_data(instance->context->rdp, channelId, data, size, flags);
 }
 
 BOOL freerdp_disconnect(freerdp* instance)

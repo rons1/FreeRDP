@@ -124,18 +124,6 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 		pc->cliprdr = (CliprdrClientContext*)e->pInterface;
 		pf_cliprdr_register_callbacks(pc->cliprdr, ps->cliprdr, pc->pdata);
 	}
-	else if (strcmp(e->name, "rdpsnd") == 0)
-	{
-		/* sound is disabled */
-		if (ps->rdpsnd == NULL)
-			return;
-
-		if (ps->rdpsnd->Initialize(ps->rdpsnd, TRUE) != CHANNEL_RC_OK)
-		{
-			WLog_ERR(TAG, "failed to open rdpsnd channel");
-			return;
-		}
-	}
 }
 
 void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEventArgs* e)
@@ -178,15 +166,6 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 
 		pc->cliprdr = NULL;
 	}
-	else if (strcmp(e->name, "rdpsnd") == 0)
-	{
-		/* sound is disabled */
-		if (ps->rdpsnd == NULL)
-			return;
-
-		if (ps->rdpsnd->Stop(ps->rdpsnd) != CHANNEL_RC_OK)
-			WLog_ERR(TAG, "failed to close rdpsnd server");
-	}
 }
 
 BOOL pf_server_channels_init(pServerContext* ps)
@@ -213,12 +192,6 @@ BOOL pf_server_channels_init(pServerContext* ps)
 		client->settings->RedirectClipboard = TRUE;
 
 		if (!pf_server_cliprdr_init(ps))
-			return FALSE;
-	}
-
-	if (config->AudioOutput && WTSVirtualChannelManagerIsChannelJoined(ps->vcm, "rdpsnd"))
-	{
-		if (!pf_server_rdpsnd_init(ps))
 			return FALSE;
 	}
 
@@ -252,6 +225,7 @@ BOOL pf_server_channels_init(pServerContext* ps)
 			}
 
 			channel_id = (UINT64)WTSChannelGetId(ps->context.peer, channel_name);
+			printf("opened channel server: %s id %d\n", channel_name, channel_id);
 			HashTable_Add(ps->vc_ids, channel_name, (void*)channel_id);
 		}
 	}
@@ -277,12 +251,6 @@ void pf_server_channels_free(pServerContext* ps)
 	{
 		cliprdr_server_context_free(ps->cliprdr);
 		ps->cliprdr = NULL;
-	}
-
-	if (ps->rdpsnd)
-	{
-		rdpsnd_server_context_free(ps->rdpsnd);
-		ps->rdpsnd = NULL;
 	}
 
 	if (ps->rail)

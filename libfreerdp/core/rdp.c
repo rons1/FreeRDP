@@ -1662,9 +1662,10 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 	return status;
 }
 
-BOOL rdp_send_channel_data(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_t size)
+BOOL rdp_send_channel_data(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_t size,
+                           INT32 flags)
 {
-	return freerdp_channel_send(rdp, channelId, data, size);
+	return freerdp_channel_send(rdp, channelId, data, size, flags);
 }
 
 BOOL rdp_send_error_info(rdpRdp* rdp)

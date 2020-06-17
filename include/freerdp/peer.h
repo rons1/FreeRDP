@@ -52,7 +52,7 @@ typedef BOOL (*psPeerAdjustMonitorsLayout)(freerdp_peer* peer);
 typedef BOOL (*psPeerClientCapabilities)(freerdp_peer* peer);
 
 typedef BOOL (*psPeerSendChannelData)(freerdp_peer* peer, UINT16 channelId, const BYTE* data,
-                                      size_t size);
+                                      size_t size, INT32 flags);
 typedef BOOL (*psPeerReceiveChannelData)(freerdp_peer* peer, UINT16 channelId, const BYTE* data,
                                          size_t size, UINT32 flags, size_t totalSize);
 
@@ -61,7 +61,7 @@ typedef BOOL (*psPeerVirtualChannelClose)(freerdp_peer* peer, HANDLE hChannel);
 typedef int (*psPeerVirtualChannelRead)(freerdp_peer* peer, HANDLE hChannel, BYTE* buffer,
                                         UINT32 length);
 typedef int (*psPeerVirtualChannelWrite)(freerdp_peer* peer, HANDLE hChannel, const BYTE* buffer,
-                                         UINT32 length);
+                                         UINT32 length, INT32 flags);
 typedef void* (*psPeerVirtualChannelGetData)(freerdp_peer* peer, HANDLE hChannel);
 typedef int (*psPeerVirtualChannelSetData)(freerdp_peer* peer, HANDLE hChannel, void* data);
 

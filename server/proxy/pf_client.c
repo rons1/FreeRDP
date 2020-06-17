@@ -73,6 +73,7 @@ static void pf_client_on_error_info(void* ctx, ErrorInfoEventArgs* e)
 
 static BOOL pf_client_load_rdpsnd(pClientContext* pc)
 {
+	return TRUE;
 	rdpContext* context = (rdpContext*)pc;
 	pServerContext* ps = pc->pdata->ps;
 	proxyConfig* config = pc->pdata->config;
@@ -125,9 +126,21 @@ static BOOL pf_client_passthrough_channels_init(pClientContext* pc)
 			continue;
 		}
 
-		channel.options = CHANNEL_OPTION_INITIALIZED; /* TODO: Export to config. */
-		strncpy(channel.name, channel_name, CHANNEL_NAME_LEN);
+		if (strcmp(channel_name, "rdpdr") == 0)
+		{
+			channel.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP |
+			                  CHANNEL_OPTION_COMPRESS_RDP;
+		}
+		else if (strcmp(channel_name, "rdpsnd") == 0)
+		{
+			channel.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP;
+		}
+		else
+		{
+			channel.options = CHANNEL_OPTION_INITIALIZED; /* TODO: Export to config. */
+		}
 
+		strncpy(channel.name, channel_name, CHANNEL_NAME_LEN);
 		settings->ChannelDefArray[settings->ChannelCount++] = channel;
 	}
 
@@ -178,7 +191,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	settings->GlyphSupportLevel = GLYPH_SUPPORT_NONE;
 	ZeroMemory(settings->OrderSupport, 32);
 
-	settings->SupportDynamicChannels = TRUE;
+	settings->SupportDynamicChannels = FALSE;
 
 	/* Multimon */
 	settings->UseMultimon = TRUE;
@@ -252,6 +265,10 @@ static BOOL pf_client_receive_channel_data_hook(freerdp* instance, UINT16 channe
 	{
 		if (strncmp(channel_name, config->Passthrough[i], CHANNEL_NAME_LEN) == 0)
 		{
+			if (strcmp(channel_name, "drdynvc") != 0)
+				WLog_INFO(TAG, "client got passthrough data from channel %s, flags 0%x",
+				          channel_name, flags);
+
 			proxyChannelDataEventInfo ev;
 			UINT64 server_channel_id;
 
@@ -260,12 +277,9 @@ static BOOL pf_client_receive_channel_data_hook(freerdp* instance, UINT16 channe
 			ev.data = data;
 			ev.data_len = size;
 
-			if (!pf_modules_run_filter(FILTER_TYPE_CLIENT_PASSTHROUGH_CHANNEL_DATA, pdata, &ev))
-				return FALSE;
-
 			server_channel_id = (UINT64)HashTable_GetItemValue(ps->vc_ids, (void*)channel_name);
 			return ps->context.peer->SendChannelData(ps->context.peer, (UINT16)server_channel_id,
-			                                         data, size);
+			                                         data, size, flags);
 		}
 	}
 

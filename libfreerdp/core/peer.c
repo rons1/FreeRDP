@@ -109,7 +109,7 @@ static BOOL freerdp_peer_virtual_channel_close(freerdp_peer* client, HANDLE hCha
 }
 
 static int freerdp_peer_virtual_channel_write(freerdp_peer* client, HANDLE hChannel,
-                                              const BYTE* buffer, UINT32 length)
+                                              const BYTE* buffer, UINT32 length, INT32 flags2)
 {
 	wStream* s;
 	UINT32 flags;
@@ -154,7 +154,7 @@ static int freerdp_peer_virtual_channel_write(freerdp_peer* client, HANDLE hChan
 			flags |= CHANNEL_FLAG_SHOW_PROTOCOL;
 
 		Stream_Write_UINT32(s, totalLength);
-		Stream_Write_UINT32(s, flags);
+		Stream_Write_UINT32(s, flags2 == -1 ? flags : flags2);
 
 		if (!Stream_EnsureRemainingCapacity(s, chunkSize))
 		{
@@ -739,9 +739,9 @@ static void freerdp_peer_disconnect(freerdp_peer* client)
 }
 
 static BOOL freerdp_peer_send_channel_data(freerdp_peer* client, UINT16 channelId, const BYTE* data,
-                                           size_t size)
+                                           size_t size, INT32 flags)
 {
-	return rdp_send_channel_data(client->context->rdp, channelId, data, size);
+	return rdp_send_channel_data(client->context->rdp, channelId, data, size, flags);
 }
 
 static BOOL freerdp_peer_is_write_blocked(freerdp_peer* peer)

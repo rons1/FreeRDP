@@ -49,7 +49,8 @@
 
 #define TAG FREERDP_TAG("core.channels")
 
-BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_t size)
+BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_t size,
+                          INT32 flags2)
 {
 	DWORD i;
 	size_t left;
@@ -100,7 +101,7 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 		}
 
 		Stream_Write_UINT32(s, size);
-		Stream_Write_UINT32(s, flags);
+		Stream_Write_UINT32(s, flags2 == -1 ? flags : flags2);
 
 		if (!Stream_EnsureCapacity(s, chunkSize))
 		{

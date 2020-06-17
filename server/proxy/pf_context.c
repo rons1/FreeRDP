@@ -138,6 +138,7 @@ BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src)
 
 	/* keep original ServerMode value */
 	dst->ServerMode = before_copy->ServerMode;
+	dst->VirtualChannelChunkSize = before_copy->VirtualChannelChunkSize;
 
 	/* revert some values that must not be changed */
 	REVERT_STR_VALUE(ConfigPath);
@@ -151,6 +152,7 @@ BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src)
 
 	if (!dst->ServerMode)
 	{
+
 		/* adjust instance pointer */
 		dst->instance = before_copy->instance;
 
@@ -163,6 +165,9 @@ BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src)
 		free(dst->RdpServerRsaKey->PrivateExponent);
 		free(dst->RdpServerRsaKey);
 		dst->RdpServerRsaKey = NULL;
+	}
+	else
+	{
 	}
 
 	rc = TRUE;

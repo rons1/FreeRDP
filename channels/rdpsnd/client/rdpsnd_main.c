@@ -1593,7 +1593,7 @@ UINT rdpsnd_DVCPluginEntry(IDRDYNVC_ENTRY_POINTS* pEntryPoints)
 		rdpsnd->iface.Disconnected = NULL;
 		rdpsnd->iface.Terminated = rdpsnd_plugin_terminated;
 		rdpsnd->attached = TRUE;
-		rdpsnd->dynamic = TRUE;
+		rdpsnd->dynamic = FALSE;
 		rdpsnd->fixed_format = audio_format_new();
 		if (!rdpsnd->fixed_format)
 			goto fail;

@@ -566,7 +566,8 @@ static BOOL freerdp_channels_process_message(freerdp* instance, wMessage* messag
 		    freerdp_channels_find_channel_by_name(instance->context->rdp, pChannelOpenData->name);
 
 		if (channel)
-			instance->SendChannelData(instance, channel->ChannelId, item->Data, item->DataLength);
+			instance->SendChannelData(instance, channel->ChannelId, item->Data, item->DataLength,
+			                          -1);
 	}
 
 	if (!freerdp_channels_process_message_free(message, CHANNEL_EVENT_WRITE_COMPLETE))
