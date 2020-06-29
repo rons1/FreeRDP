@@ -163,18 +163,10 @@ static BOOL pf_client_use_peer_load_balance_info(pClientContext* pc)
  * unwanted channels.
  */
 
-static BOOL autodetect_recv_rtt_measure_request(rdpRdp* rdp, wStream* s,
-                                                AUTODETECT_REQ_PDU* autodetectReqPdu)
-{
-	pClientContext* pc = (pClientContext*)instance->context;
-	pServerContext* ps = pc->pdata->ps;
-	return ps->context.peer->autodetect->RTTMeasureRequest(ps->context.rdp, s, autodetectReqPdu);
-}
-
 static BOOL autodetect_send_bandwidth_measure_start(rdpContext* context, UINT16 sequenceNumber,
                                                     UINT16 requestType)
 {
-	pClientContext* pc = (pClientContext*)instance->context;
+	pClientContext* pc = (pClientContext*)context;
 	pServerContext* ps = pc->pdata->ps;
 	return ps->context.peer->autodetect->BandwidthMeasureStart(ps->context.peer, sequenceNumber,
 	                                                           requestType);
@@ -182,17 +174,16 @@ static BOOL autodetect_send_bandwidth_measure_start(rdpContext* context, UINT16 
 static BOOL autodetect_send_bandwidth_measure_stop(rdpContext* context, UINT16 sequenceNumber,
                                                    UINT16 requestType)
 {
-	pClientContext* pc = (pClientContext*)instance->context;
+	pClientContext* pc = (pClientContext*)context;
 	pServerContext* ps = pc->pdata->ps;
 	return ps->context.peer->autodetect->BandwidthMeasureStop(ps->context.peer, sequenceNumber,
 	                                                          requestType);
 }
 static BOOL net_char_result(rdpContext* context, UINT16 sequenceNumber)
 {
-	pClientContext* pc = (pClientContext*)instance->context;
+	pClientContext* pc = (pClientContext*)context;
 	pServerContext* ps = pc->pdata->ps;
 	return ps->context.peer->autodetect->NetworkCharacteristicsResult(ps->context.peer,
-	                                                                  sequenceNumber);
 }
 
 static BOOL pf_client_pre_connect(freerdp* instance)
@@ -202,9 +193,8 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	proxyConfig* config = ps->pdata->config;
 	rdpSettings* settings = instance->settings;
 
-	instance->autodetect->RTTMeasureRequest = measure_request;
 	instance->autodetect->BandwidthMeasureStart = bandwith_measure_start;
-	instance->autodetect->BandwidthMeasureStop = bandwith_measure_stop;
+	instance->autodetect->BandwidthMeasureStop = autodetect_send_bandwidth_measure_start;
 	instance->autodetect->NetworkCharacteristicsResult = net_char_result;
 
 	/*
