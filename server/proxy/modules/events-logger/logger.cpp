@@ -24,6 +24,7 @@
 
 #include <winpr/winsock.h>
 #include "modules_api.h"
+#include "pf_config.h"
 
 #define TAG MODULE_TAG("input_events_logger")
 
@@ -42,6 +43,42 @@ typedef struct plugin_data
 	HANDLE thread;
 	wMessageQueue* queue;
 } pluginData;
+
+typedef struct config
+{
+	UINT16 port;
+	char* ip_address;
+} pluginConfig;
+
+static pluginConfig config = { 0 };
+
+static BOOL logger_plugin_config_load()
+{
+	BOOL ok = FALSE;
+	wIniFile* ini = IniFile_New();
+
+	if (!ini)
+	{
+		WLog_ERR(TAG, "logger_plugin_config_load: IniFile_New() failed!");
+		return FALSE;
+	}
+
+	if (IniFile_ReadFile(ini, "events-logger.ini") < 0)
+	{
+		WLog_ERR(TAG, "logger_plugin_config_load: IniFile_ReadFile() failed!");
+		goto out;
+	}
+
+	config.ip_address = _strdup(pf_config_get_str(ini, "EventsLogger", "IpAddress"));
+	if (!pf_config_get_uint16(ini, "EventsLogger", "Port", &config.port))
+		goto out;
+
+	ok = TRUE;
+
+out:
+	IniFile_Free(ini);
+	return ok;
+}
 
 static INLINE UINT64 get_current_epoch_time()
 {
@@ -236,14 +273,17 @@ static SOCKET logger_plugin_init_socket()
 
 	memset(&servaddr, 0, sizeof(servaddr));
 
-	servaddr.sin_family = AF_INET;   /* host byte order */
-	servaddr.sin_port = htons(8889); /* short, network byte order */
-	inet_pton(AF_INET, "10.0.0.9", &(servaddr.sin_addr));
+	servaddr.sin_family = AF_INET;          /* host byte order */
+	servaddr.sin_port = htons(config.port); /* short, network byte order */
+	inet_pton(AF_INET, config.ip_address, &(servaddr.sin_addr));
 	return sockfd;
 }
 
 static BOOL logger_plugin_unload()
 {
+	/* free config */
+	free(config.ip_address);
+
 	closesocket(sock);
 	return TRUE;
 }
@@ -270,10 +310,14 @@ BOOL proxy_module_entry_point(proxyPluginsManager* plugins_manager)
 {
 	g_plugins_manager = plugins_manager;
 
+	if (!logger_plugin_config_load())
+		return FALSE;
+
 	sock = logger_plugin_init_socket();
 	if (sock == -1)
 		return FALSE;
 
-	WLog_INFO(TAG, "logger plugin is initialized");
+	WLog_INFO(TAG, "Logger plugin is initialized. logs will be sent to %s:%d.", config.ip_address,
+	          config.port);
 	return plugins_manager->RegisterPlugin(&demo_plugin);
 }
