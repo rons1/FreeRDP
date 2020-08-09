@@ -51,8 +51,6 @@ set(${MODULE_PREFIX}_SRCS
   pf_modules.h
   pf_cliprdr.c
   pf_cliprdr.h
-  pf_rdpsnd.c
-  pf_rdpsnd.h
   pf_log.h
   )
 

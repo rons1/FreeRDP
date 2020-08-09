@@ -85,33 +85,6 @@ static void pf_client_on_activated(void* ctx, ActivatedEventArgs* e)
 	pf_server_register_update_callbacks(peer->update);
 }
 
-static BOOL pf_client_load_rdpsnd(pClientContext* pc)
-{
-	rdpContext* context = (rdpContext*)pc;
-	pServerContext* ps = pc->pdata->ps;
-	proxyConfig* config = pc->pdata->config;
-
-	/*
-	 * if AudioOutput is enabled in proxy and client connected with rdpsnd, use proxy as rdpsnd
-	 * backend. Otherwise, use sys:fake.
-	 */
-	if (!freerdp_static_channel_collection_find(context->settings, "rdpsnd"))
-	{
-		char* params[2];
-		params[0] = "rdpsnd";
-
-		if (config->AudioOutput && WTSVirtualChannelManagerIsChannelJoined(ps->vcm, "rdpsnd"))
-			params[1] = "sys:proxy";
-		else
-			params[1] = "sys:fake";
-
-		if (!freerdp_client_add_static_channel(context->settings, 2, (char**)params))
-			return FALSE;
-	}
-
-	return TRUE;
-}
-
 static BOOL pf_client_passthrough_channels_init(pClientContext* pc)
 {
 	pServerContext* ps = pc->pdata->ps;
