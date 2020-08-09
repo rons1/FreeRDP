@@ -155,20 +155,13 @@ static BOOL pf_server_get_target_info(rdpContext* context, rdpSettings* settings
 	return TRUE;
 }
 
-/* Event callbacks */
-/**
- * This callback is called when the entire connection sequence is done (as
- * described in MS-RDPBCGR section 1.3)
- *
- * The server may start sending graphics output and receiving keyboard/mouse
- * input after this callback returns.
- */
 static BOOL pf_server_post_connect(freerdp_peer* peer)
 {
 	pServerContext* ps;
 	pClientContext* pc;
 	rdpSettings* client_settings;
 	proxyData* pdata;
+
 	ps = (pServerContext*)peer->context;
 	pdata = ps->pdata;
 
@@ -181,7 +174,6 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 
 	client_settings = pc->context.settings;
 
-	/* keep both sides of the connection in pdata */
 	proxy_data_set_client_context(pdata, pc);
 
 	if (!pf_server_get_target_info(peer->context, client_settings, pdata->config))
@@ -202,10 +194,9 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	if (!pf_modules_run_hook(HOOK_TYPE_SERVER_POST_CONNECT, pdata))
 		return FALSE;
 
-	/* Start a proxy's client in it's own thread */
-	if (!(pdata->client_thread = CreateThread(NULL, 0, pf_client_start, pc, 0, NULL)))
+	if (!pf_client_start(pc))
 	{
-		LOG_ERR(TAG, ps, "failed to create client thread");
+		LOG_ERR(TAG, ps, "failed to start proxy client");
 		return FALSE;
 	}
 
@@ -241,7 +232,9 @@ static BOOL pf_server_receive_channel_data_hook(freerdp_peer* peer, UINT16 chann
 	 * which doesn't need to be proxied.
 	 */
 	if (!pc)
+	{
 		goto original_cb;
+	}
 
 	for (i = 0; i < config->PassthroughCount; i++)
 	{
@@ -312,7 +305,7 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 
 	if (!settings->CertificateFile || !settings->PrivateKeyFile || !settings->RdpKeyFile)
 	{
-		WLog_ERR(TAG, "Memory allocation failed (strdup)");
+		LOG_ERR(TAG, ps, "Memory allocation failed (strdup)");
 		return FALSE;
 	}
 
@@ -341,6 +334,55 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 	return TRUE;
 }
 
+static BOOL pf_server_check_wts_server_fds(pServerContext* ps, HANDLE channelEvent)
+{
+	proxyConfig* config;
+
+	if (!ps)
+		return FALSE;
+
+	config = ps->pdata->config;
+
+	if (WaitForSingleObject(channelEvent, 0) == WAIT_OBJECT_0)
+	{
+		if (!WTSVirtualChannelManagerCheckFileDescriptorEx(ps->vcm,
+		                                                   !config->PassthroughDynamicChannels))
+		{
+			WLog_ERR(TAG, "WTSVirtualChannelManagerCheckFileDescriptor failure");
+			return FALSE;
+		}
+	}
+
+	if (config->PassthroughDynamicChannels)
+		return TRUE;
+
+	switch (WTSVirtualChannelManagerGetDrdynvcState(ps->vcm))
+	{
+		/* Dynamic channel status may have been changed after processing */
+		case DRDYNVC_STATE_NONE:
+
+			/* Initialize drdynvc channel */
+			if (!WTSVirtualChannelManagerCheckFileDescriptor(ps->vcm))
+			{
+				WLog_ERR(TAG, "Failed to initialize drdynvc channel");
+				return FALSE;
+			}
+			break;
+
+		case DRDYNVC_STATE_READY:
+			if (WaitForSingleObject(ps->dynvcReady, 0) == WAIT_TIMEOUT)
+			{
+				SetEvent(ps->dynvcReady);
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	return TRUE;
+}
+
 /**
  * Handles an incoming client connection, to be run in it's own thread.
  *
@@ -356,6 +398,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 	pServerContext* ps;
 	rdpContext* pc;
 	proxyData* pdata;
+	proxyConfig* config;
 	freerdp_peer* client = (freerdp_peer*)arg;
 	proxyServer* server = (proxyServer*)client->ContextExtra;
 
@@ -367,11 +410,12 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 
 	ps = (pServerContext*)client->context;
 	pdata = ps->pdata;
+	config = pdata->config;
 
 	client->Initialize(client);
-	LOG_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s", pdata->config->Host,
+	LOG_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s", config->Host,
 	         client->hostname);
-	/* Main client event handling loop */
+
 	ChannelEvent = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
 
 	while (1)
@@ -382,70 +426,48 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 
 			if (tmp == 0)
 			{
-				WLog_ERR(TAG, "Failed to get FreeRDP transport event handles");
+				LOG_ERR(TAG, ps, "Failed to get FreeRDP transport event handles");
 				break;
 			}
 
 			eventCount += tmp;
 		}
+
 		eventHandles[eventCount++] = ChannelEvent;
 		eventHandles[eventCount++] = pdata->abort_event;
-		eventHandles[eventCount++] = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
+
 		status = WaitForMultipleObjects(eventCount, eventHandles, FALSE, INFINITE);
 
 		if (status == WAIT_FAILED)
 		{
-			WLog_ERR(TAG, "WaitForMultipleObjects failed (status: %d)", status);
+			LOG_ERR(TAG, ps, "WaitForMultipleObjects failed (status: %d)", status);
 			break;
 		}
 
-		if (client->CheckFileDescriptor(client) != TRUE)
-			break;
+		EnterCriticalSection(&pdata->lock);
 
-		if (WaitForSingleObject(ChannelEvent, 0) == WAIT_OBJECT_0)
-		{
-			if (!WTSVirtualChannelManagerCheckFileDescriptor(ps->vcm))
-			{
-				WLog_ERR(TAG, "WTSVirtualChannelManagerCheckFileDescriptor failure");
-				goto fail;
-			}
-		}
-
-		/* only disconnect after checking client's and vcm's file descriptors  */
 		if (proxy_data_shall_disconnect(pdata))
 		{
-			WLog_INFO(TAG, "abort event is set, closing connection with peer %s", client->hostname);
+			LOG_INFO(TAG, ps, "abort event is set, closing connection with peer %s",
+			         client->hostname);
+			LeaveCriticalSection(&pdata->lock);
 			break;
 		}
 
-		switch (WTSVirtualChannelManagerGetDrdynvcState(ps->vcm))
+		if (!client->CheckFileDescriptor(client))
 		{
-			/* Dynamic channel status may have been changed after processing */
-			case DRDYNVC_STATE_NONE:
-
-				/* Initialize drdynvc channel */
-				if (!WTSVirtualChannelManagerCheckFileDescriptor(ps->vcm))
-				{
-					WLog_ERR(TAG, "Failed to initialize drdynvc channel");
-					goto fail;
-				}
-
-				break;
-
-			case DRDYNVC_STATE_READY:
-				if (WaitForSingleObject(ps->dynvcReady, 0) == WAIT_TIMEOUT)
-				{
-					SetEvent(ps->dynvcReady);
-				}
-
-				break;
-
-			default:
-				break;
+			LeaveCriticalSection(&pdata->lock);
+			break;
 		}
-	}
 
-fail:
+		if (!pf_server_check_wts_server_fds(ps, ChannelEvent))
+		{
+			LeaveCriticalSection(&pdata->lock);
+			break;
+		}
+
+		LeaveCriticalSection(&pdata->lock);
+	}
 
 	pc = (rdpContext*)pdata->pc;
 	LOG_INFO(TAG, ps, "starting shutdown of connection");

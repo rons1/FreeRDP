@@ -25,7 +25,9 @@
 #include <freerdp/freerdp.h>
 #include <winpr/wtypes.h>
 
+#include "pf_context.h"
+
 int RdpClientEntry(RDP_CLIENT_ENTRY_POINTS* pEntryPoints);
-DWORD WINAPI pf_client_start(LPVOID arg);
+BOOL pf_client_start(pClientContext* pc);
 
 #endif /* FREERDP_SERVER_PROXY_PFCLIENT_H */

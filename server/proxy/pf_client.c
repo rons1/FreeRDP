@@ -159,18 +159,25 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	settings->GlyphSupportLevel = GLYPH_SUPPORT_NONE;
 	ZeroMemory(settings->OrderSupport, 32);
 
-	settings->SupportDynamicChannels = TRUE;
-
-	/* Multimon */
-	settings->UseMultimon = TRUE;
-
-	/* Sound */
 	settings->AudioPlayback = FALSE;
-	settings->DeviceRedirection = TRUE;
+
+	/* if proxying `drdynvc` as a passthrough channel, tell FreeRDP to not load `drdynvc` channel */
+	if (config->PassthroughDynamicChannels)
+	{
+		settings->AudioPlayback = config->AudioOutput;
+		settings->SupportDynamicChannels = FALSE;
+	}
+	else
+		settings->SupportDynamicChannels = TRUE;
 
 	/* Display control */
 	settings->SupportDisplayControl = config->DisplayControl;
 	settings->DynamicResolutionUpdate = config->DisplayControl;
+
+	/* Multimon */
+	settings->UseMultimon = TRUE;
+
+	settings->DeviceRedirection = TRUE;
 
 	settings->AutoReconnectionEnabled = TRUE;
 
@@ -195,12 +202,6 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 
 	if (!pf_client_passthrough_channels_init(pc))
 		return FALSE;
-
-	if (!pf_client_load_rdpsnd(pc))
-	{
-		LOG_ERR(TAG, pc, "Failed to load rdpsnd client");
-		return FALSE;
-	}
 
 	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
 	{
@@ -239,6 +240,7 @@ static BOOL pf_client_receive_channel_data_hook(freerdp* instance, UINT16 channe
 				return FALSE;
 
 			server_channel_id = (UINT64)HashTable_GetItemValue(ps->vc_ids, (void*)channel_name);
+
 			return ps->context.peer->SendChannelData(ps->context.peer, (UINT16)server_channel_id,
 			                                         data, size);
 		}
@@ -497,10 +499,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 			break;
 		}
 
-		if (freerdp_shall_disconnect(instance))
-			break;
-
-		if (proxy_data_shall_disconnect(pdata))
+		if (freerdp_shall_disconnect(instance) || proxy_data_shall_disconnect(pdata))
 			break;
 
 		if (!freerdp_check_event_handles(instance->context))
@@ -512,7 +511,13 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 		}
 	}
 
+	EnterCriticalSection(&pdata->lock);
+
+	/* signal server main loop to stop*/
+	proxy_data_abort_connect(pdata);
 	freerdp_disconnect(instance);
+
+	LeaveCriticalSection(&pdata->lock);
 	return 0;
 }
 
@@ -553,25 +558,6 @@ static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host
 	return 1;
 }
 
-/**
- * Callback set in the rdp_freerdp structure, and used to make a certificate validation
- * when a stored certificate does not match the remote counterpart.
- * This function will actually be called by tls_verify_certificate().
- * @see rdp_client_connect() and tls_connect()
- * @param instance        pointer to the rdp_freerdp structure that contains the connection settings
- * @param host            The host currently connecting to
- * @param port            The port currently connecting to
- * @param common_name     The common name of the certificate, should match host or an alias of it
- * @param subject         The subject of the certificate
- * @param issuer          The certificate issuer name
- * @param fingerprint     The fingerprint of the certificate
- * @param old_subject     The subject of the previous certificate
- * @param old_issuer      The previous certificate issuer name
- * @param old_fingerprint The fingerprint of the previous certificate
- * @param flags           See VERIFY_CERT_FLAG_* for possible values.
- *
- * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
- */
 static DWORD pf_client_verify_changed_certificate_ex(
     freerdp* instance, const char* host, UINT16 port, const char* common_name, const char* subject,
     const char* issuer, const char* fingerprint, const char* old_subject, const char* old_issuer,
@@ -643,14 +629,29 @@ int RdpClientEntry(RDP_CLIENT_ENTRY_POINTS* pEntryPoints)
 }
 
 /**
- * Starts running a client connection towards target server.
+ * Starts running a client connection towards target server, in a new thread.
+ * Thread handle is saved in `pdata->client_thread`.
  */
-DWORD WINAPI pf_client_start(LPVOID arg)
+BOOL pf_client_start(pClientContext* pc)
 {
-	rdpContext* context = (rdpContext*)arg;
+	rdpContext* context;
+	proxyData* pdata;
+
+	if (!pc)
+		return FALSE;
+
+	context = &pc->context;
+	pdata = pc->pdata;
 
 	if (freerdp_client_start(context) != 0)
-		return 1;
+		return FALSE;
 
-	return pf_client_thread_proc(context->instance);
+	pdata->client_thread = CreateThread(NULL, 0, pf_client_thread_proc, context->instance, 0, NULL);
+	if (!pdata->client_thread)
+	{
+		LOG_ERR(TAG, pc, "failed to create client thread");
+		return FALSE;
+	}
+
+	return TRUE;
 }

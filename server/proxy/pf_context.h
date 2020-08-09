@@ -113,6 +113,9 @@ struct proxy_data
 
 	/* used to external modules to store per-session info */
 	wHashTable* modules_info;
+
+	/* used to ensure no server events will pop up while client is in disconnect state */
+	CRITICAL_SECTION lock;
 };
 
 BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src);

@@ -85,11 +85,13 @@ error:
 static void client_to_proxy_context_free(freerdp_peer* client, pServerContext* context)
 {
 	proxyServer* server;
+	proxyConfig* config;
 
 	if (!client || !context)
 		return;
 
 	server = (proxyServer*)client->ContextExtra;
+	config = server->config;
 
 	WTSCloseServer((HANDLE)context->vcm);
 
@@ -232,6 +234,7 @@ proxyData* proxy_data_new(void)
 	pdata->modules_info->keyClone = HashTable_StringClone;
 	pdata->modules_info->keyFree = HashTable_StringFree;
 
+	InitializeCriticalSection(&pdata->lock);
 	return pdata;
 error:
 	proxy_data_free(pdata);
@@ -275,6 +278,7 @@ void proxy_data_free(proxyData* pdata)
 	if (pdata->modules_info)
 		HashTable_Free(pdata->modules_info);
 
+	DeleteCriticalSection(&pdata->lock);
 	free(pdata);
 }
 

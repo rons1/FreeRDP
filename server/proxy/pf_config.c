@@ -163,11 +163,13 @@ static BOOL pf_config_load_target(wIniFile* ini, proxyConfig* config)
 
 static BOOL pf_config_load_channels(wIniFile* ini, proxyConfig* config)
 {
+
 	config->GFX = pf_config_get_bool(ini, "Channels", "GFX");
 	config->DisplayControl = pf_config_get_bool(ini, "Channels", "DisplayControl");
 	config->Clipboard = pf_config_get_bool(ini, "Channels", "Clipboard");
 	config->AudioOutput = pf_config_get_bool(ini, "Channels", "AudioOutput");
 	config->RemoteApp = pf_config_get_bool(ini, "Channels", "RemoteApp");
+
 	config->Passthrough = pf_config_parse_comma_separated_list(
 	    pf_config_get_str(ini, "Channels", "Passthrough"), &config->PassthroughCount);
 
@@ -177,6 +179,9 @@ static BOOL pf_config_load_channels(wIniFile* ini, proxyConfig* config)
 
 		for (i = 0; i < config->PassthroughCount; i++)
 		{
+			if (strcmp(config->Passthrough[i], "drdynvc") == 0)
+				config->PassthroughDynamicChannels = TRUE;
+
 			if (strlen(config->Passthrough[i]) > CHANNEL_NAME_LEN)
 			{
 				WLog_ERR(TAG, "passthrough channel: %s: name too long!", config->Passthrough[i]);
@@ -301,6 +306,13 @@ static void pf_server_config_print_list(char** list, size_t count)
 
 void pf_server_config_print(proxyConfig* config)
 {
+	BOOL proxyDrdynvcMode;
+
+	if (!config)
+		return;
+
+	proxyDrdynvcMode = config->PassthroughDynamicChannels;
+
 	WLog_INFO(TAG, "Proxy configuration:");
 
 	CONFIG_PRINT_SECTION("Server");
@@ -329,8 +341,12 @@ void pf_server_config_print(proxyConfig* config)
 	CONFIG_PRINT_BOOL(config, ClientAllowFallbackToTls);
 
 	CONFIG_PRINT_SECTION("Channels");
-	CONFIG_PRINT_BOOL(config, GFX);
-	CONFIG_PRINT_BOOL(config, DisplayControl);
+	if (!proxyDrdynvcMode)
+	{
+		CONFIG_PRINT_BOOL(config, GFX);
+		CONFIG_PRINT_BOOL(config, DisplayControl);
+	}
+
 	CONFIG_PRINT_BOOL(config, Clipboard);
 	CONFIG_PRINT_BOOL(config, AudioOutput);
 	CONFIG_PRINT_BOOL(config, RemoteApp);
@@ -346,8 +362,17 @@ void pf_server_config_print(proxyConfig* config)
 	if (config->MaxTextLength > 0)
 		CONFIG_PRINT_UINT32(config, MaxTextLength);
 
-	CONFIG_PRINT_SECTION("GFXSettings");
-	CONFIG_PRINT_BOOL(config, DecodeGFX);
+	if (!proxyDrdynvcMode)
+	{
+		CONFIG_PRINT_SECTION("GFXSettings");
+		CONFIG_PRINT_BOOL(config, DecodeGFX);
+	}
+	else
+	{
+		WLog_INFO(TAG, "Proxy is in dynamic virtual channels proxy mode, meaning that every");
+		WLog_INFO(TAG, "dynamic virtual channel will be proxied, and the GFX capture module won't "
+		               "be available");
+	}
 }
 
 void pf_server_config_free(proxyConfig* config)
