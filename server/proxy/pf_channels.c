@@ -40,7 +40,6 @@
 #include "pf_disp.h"
 #include "pf_log.h"
 #include "pf_modules.h"
-#include "pf_rdpsnd.h"
 
 #define TAG PROXY_TAG("channels")
 
@@ -189,13 +188,12 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	}
 }
 
-BOOL pf_server_channels_init(pServerContext* ps)
+static BOOL pf_server_channels_init_dynamic(pServerContext* ps)
 {
-	rdpContext* context = (rdpContext*)ps;
-	rdpContext* client = (rdpContext*)ps->pdata->pc;
 	proxyConfig* config = ps->pdata->config;
+	rdpSettings* settings = ps->context.settings;
 
-	if (context->settings->SupportGraphicsPipeline && config->GFX)
+	if (settings->SupportGraphicsPipeline && config->GFX)
 	{
 		if (!pf_server_rdpgfx_init(ps))
 			return FALSE;
@@ -207,18 +205,27 @@ BOOL pf_server_channels_init(pServerContext* ps)
 			return FALSE;
 	}
 
+	return TRUE;
+}
+
+BOOL pf_server_channels_init(pServerContext* ps)
+{
+	rdpContext* context = (rdpContext*)ps;
+	rdpContext* client = (rdpContext*)ps->pdata->pc;
+	proxyConfig* config = ps->pdata->config;
+
+	if (!config->PassthroughDynamicChannels)
+	{
+		if (!pf_server_channels_init_dynamic(ps))
+			return FALSE;
+	}
+
 	if (config->Clipboard &&
 	    WTSVirtualChannelManagerIsChannelJoined(ps->vcm, CLIPRDR_SVC_CHANNEL_NAME))
 	{
 		client->settings->RedirectClipboard = TRUE;
 
 		if (!pf_server_cliprdr_init(ps))
-			return FALSE;
-	}
-
-	if (config->AudioOutput && WTSVirtualChannelManagerIsChannelJoined(ps->vcm, "rdpsnd"))
-	{
-		if (!pf_server_rdpsnd_init(ps))
 			return FALSE;
 	}
 
@@ -281,8 +288,6 @@ void pf_server_channels_free(pServerContext* ps)
 
 	if (ps->rdpsnd)
 	{
-		rdpsnd_server_context_free(ps->rdpsnd);
-		ps->rdpsnd = NULL;
 	}
 
 	if (ps->rail)
