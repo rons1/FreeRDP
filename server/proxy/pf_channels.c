@@ -188,6 +188,157 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	}
 }
 
+BOOL pf_channels_client_passthrough_channels_init(pClientContext* pc)
+{
+	pServerContext* ps = pc->pdata->ps;
+	rdpSettings* settings = pc->context.settings;
+	proxyConfig* config = pc->pdata->config;
+	size_t i;
+
+	if (settings->ChannelCount + config->PassthroughCount >= settings->ChannelDefArraySize)
+	{
+		LOG_ERR(TAG, pc, "too many channels");
+		return FALSE;
+	}
+
+	for (i = 0; i < config->PassthroughCount; i++)
+	{
+		const char* channel_name = config->Passthrough[i];
+		CHANNEL_DEF channel = { 0 };
+
+		/* only connect connect this channel if already joined in peer connection */
+		if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
+		{
+			LOG_INFO(TAG, ps, "client did not connected with channel %s, skipping passthrough",
+			         channel_name);
+
+			continue;
+		}
+
+		if (strcmp(channel_name, "rdpdr") == 0)
+			channel.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP |
+			                  CHANNEL_OPTION_COMPRESS_RDP; /* TODO: Export to config. */
+		else if (strcmp(channel_name, "drdynvc") == 0)
+			channel.options = CHANNEL_OPTION_INITIALIZED | CHANNEL_OPTION_ENCRYPT_RDP |
+			                  CHANNEL_OPTION_COMPRESS_RDP; /* TODO: Export to config. */
+		else
+			channel.options = CHANNEL_OPTION_INITIALIZED;
+
+		strncpy(channel.name, channel_name, CHANNEL_NAME_LEN);
+		settings->ChannelDefArray[settings->ChannelCount++] = channel;
+	}
+
+	return TRUE;
+}
+
+/* allocate a new stream for virtual channel pdu */
+static BOOL pf_channels_handle_passthrough_first_chunk(wHashTable* data_in_map, UINT16 channel_id,
+                                                       size_t total_size)
+{
+	void* key = (void*)(ULONG_PTR)channel_id;
+	wStream* tmp = HashTable_GetItemValue(data_in_map, key);
+
+	if (tmp)
+		HashTable_Remove(data_in_map, key);
+
+	tmp = Stream_New(NULL, total_size);
+	if (!tmp)
+	{
+		WLog_ERR(TAG, "Stream_New failed!");
+		return FALSE;
+	}
+
+	if (HashTable_Add(data_in_map, key, tmp) < 0)
+	{
+		Stream_Free(tmp, TRUE);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL pf_channels_handle_passthrough_channel_data(proxyData* pdata, BOOL serverMode,
+                                                 UINT16 channel_id, const char* channel_name,
+                                                 const BYTE* data, size_t size, UINT32 flags,
+                                                 size_t total_size)
+{
+	wHashTable *data_in_map, *vc_ids_map;
+	wStream* data_in = NULL;
+	void* key = (void*)(ULONG_PTR)channel_id;
+	BOOL rc = TRUE;
+
+	if (serverMode)
+	{
+		data_in_map = pdata->ps->vc_data_in;
+		vc_ids_map = pdata->pc->vc_ids;
+	}
+	else
+	{
+		data_in_map = pdata->pc->vc_data_in;
+		vc_ids_map = pdata->ps->vc_ids;
+	}
+
+	if (flags & CHANNEL_FLAG_FIRST)
+		pf_channels_handle_passthrough_first_chunk(data_in_map, channel_id, total_size);
+
+	data_in = HashTable_GetItemValue(data_in_map, key);
+	if (!data_in)
+		return FALSE;
+
+	if (!Stream_EnsureRemainingCapacity(data_in, size))
+	{
+		HashTable_Remove(data_in_map, key);
+		return FALSE;
+	}
+
+	Stream_Write(data_in, data, size);
+
+	if (flags & CHANNEL_FLAG_LAST)
+	{
+		proxyChannelDataEventInfo ev = { channel_name, channel_id, Stream_Buffer(data_in),
+			                             total_size };
+		PF_FILTER_TYPE filter = serverMode ? FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA
+		                                   : FILTER_TYPE_CLIENT_PASSTHROUGH_CHANNEL_DATA;
+		UINT16 s_ch_id = (UINT16)(UINT64)HashTable_GetItemValue(vc_ids_map, (void*)channel_name);
+
+		if (Stream_Capacity(data_in) != Stream_GetPosition(data_in))
+		{
+			LOG_ERR(TAG, pdata->ps, "passthrough channel read error: channel_name=%s",
+			        channel_name);
+			return FALSE;
+		}
+
+		Stream_SealLength(data_in);
+		Stream_SetPosition(data_in, 0);
+
+		LOG_DBG(TAG, pdata->ps, "%s received data from %s in channel '%s'. length=%d",
+		        (serverMode ? "server" : "client"), (serverMode ? "peer" : "remote server"),
+		        channel_name, total_size);
+
+		if (!pf_modules_run_filter(filter, pdata, &ev))
+		{
+			/* filter returned false, do not passthrough this pdu */
+			HashTable_Remove(data_in_map, key);
+			return TRUE;
+		}
+
+		if (serverMode)
+		{
+			freerdp* instance = pdata->pc->context.instance;
+			rc = instance->SendChannelData(instance, s_ch_id, Stream_Buffer(data_in), total_size);
+		}
+		else
+		{
+			freerdp_peer* peer = pdata->ps->context.peer;
+			rc = peer->SendChannelData(peer, s_ch_id, Stream_Buffer(data_in), total_size);
+		}
+
+		HashTable_Remove(data_in_map, key);
+	}
+
+	return rc;
+}
+
 static BOOL pf_server_channels_init_dynamic(pServerContext* ps)
 {
 	proxyConfig* config = ps->pdata->config;
@@ -208,13 +359,47 @@ static BOOL pf_server_channels_init_dynamic(pServerContext* ps)
 	return TRUE;
 }
 
+static BOOL pf_channels_server_passthrough_channels_init(pServerContext* ps)
+{
+	size_t i;
+	proxyConfig* config;
+
+	if (!ps)
+		return FALSE;
+
+	config = ps->pdata->config;
+
+	for (i = 0; i < config->PassthroughCount; i++)
+	{
+		char* channel_name = config->Passthrough[i];
+		UINT64 channel_id;
+
+		/* only open channel if client joined with it */
+		if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
+			continue;
+
+		ps->vc_handles[i] = WTSVirtualChannelOpen(ps->vcm, WTS_CURRENT_SESSION, channel_name);
+		if (!ps->vc_handles[i])
+		{
+			LOG_ERR(TAG, ps, "WTSVirtualChannelOpen failed for passthrough channel: %s",
+			        channel_name);
+
+			return FALSE;
+		}
+
+		channel_id = (UINT64)WTSChannelGetId(ps->context.peer, channel_name);
+		HashTable_Add(ps->vc_ids, channel_name, (void*)channel_id);
+	}
+
+	return TRUE;
+}
+
 BOOL pf_server_channels_init(pServerContext* ps)
 {
-	rdpContext* context = (rdpContext*)ps;
 	rdpContext* client = (rdpContext*)ps->pdata->pc;
 	proxyConfig* config = ps->pdata->config;
 
-	if (!config->PassthroughDynamicChannels)
+	if (!config->ProxyDrdynvc)
 	{
 		if (!pf_server_channels_init_dynamic(ps))
 			return FALSE;
@@ -236,32 +421,8 @@ BOOL pf_server_channels_init(pServerContext* ps)
 			return FALSE;
 	}
 
-	{
-		/* open static channels for passthrough */
-		size_t i;
-
-		for (i = 0; i < config->PassthroughCount; i++)
-		{
-			char* channel_name = config->Passthrough[i];
-			UINT64 channel_id;
-
-			/* only open channel if client joined with it */
-			if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
-				continue;
-
-			ps->vc_handles[i] = WTSVirtualChannelOpen(ps->vcm, WTS_CURRENT_SESSION, channel_name);
-			if (!ps->vc_handles[i])
-			{
-				LOG_ERR(TAG, ps, "WTSVirtualChannelOpen failed for passthrough channel: %s",
-				        channel_name);
-
-				return FALSE;
-			}
-
-			channel_id = (UINT64)WTSChannelGetId(ps->context.peer, channel_name);
-			HashTable_Add(ps->vc_ids, channel_name, (void*)channel_id);
-		}
-	}
+	if (!pf_channels_server_passthrough_channels_init(ps))
+		return FALSE;
 
 	return pf_modules_run_hook(HOOK_TYPE_SERVER_CHANNELS_INIT, ps->pdata);
 }
