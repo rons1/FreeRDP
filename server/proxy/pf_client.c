@@ -176,6 +176,8 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	proxyConfig* config = ps->pdata->config;
 	rdpSettings* settings = instance->settings;
 
+	settings->ExternalCertificateManagement = TRUE;
+
 	/*
 	 * as the client's settings are copied from the server's, GlyphSupportLevel might not be
 	 * GLYPH_SUPPORT_NONE. the proxy currently do not support GDI & GLYPH_SUPPORT_CACHE, so
@@ -615,6 +617,12 @@ static DWORD pf_client_verify_changed_certificate_ex(
 	return 1;
 }
 
+static int pf_client_verify_x509_cert(freerdp* instance, const BYTE* data, size_t length,
+                                      const char* hostname, UINT16 port, DWORD flags)
+{
+	return 1;
+}
+
 static void pf_client_context_free(freerdp* instance, rdpContext* context)
 {
 	pClientContext* pc = (pClientContext*)context;
@@ -634,6 +642,7 @@ static BOOL pf_client_client_new(freerdp* instance, rdpContext* context)
 	instance->PostConnect = pf_client_post_connect;
 	instance->PostDisconnect = pf_client_post_disconnect;
 	instance->VerifyCertificateEx = pf_client_verify_certificate_ex;
+	instance->VerifyX509Certificate = pf_client_verify_x509_cert;
 	instance->VerifyChangedCertificateEx = pf_client_verify_changed_certificate_ex;
 	instance->LogonErrorInfo = pf_logon_error_info;
 	instance->ContextFree = pf_client_context_free;
