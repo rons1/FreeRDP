@@ -54,6 +54,8 @@ BOOL freerdp_client_codecs_prepare(rdpCodecs* codecs, UINT32 flags, UINT32 width
 			WLog_ERR(TAG, "Failed to create nsc codec context");
 			return FALSE;
 		}
+		if (!nsc_set_log_context(codecs->nsc, codecs->context))
+			return FALSE;
 	}
 
 	if ((flags & FREERDP_CODEC_REMOTEFX) && !codecs->rfx)
@@ -63,6 +65,8 @@ BOOL freerdp_client_codecs_prepare(rdpCodecs* codecs, UINT32 flags, UINT32 width
 			WLog_ERR(TAG, "Failed to create rfx codec context");
 			return FALSE;
 		}
+		if (!rfx_set_log_context(codecs->rfx, codecs->context))
+			return FALSE;
 	}
 
 	if ((flags & FREERDP_CODEC_CLEARCODEC) && !codecs->clear)
@@ -85,6 +89,8 @@ BOOL freerdp_client_codecs_prepare(rdpCodecs* codecs, UINT32 flags, UINT32 width
 			WLog_ERR(TAG, "Failed to create progressive codec context");
 			return FALSE;
 		}
+		if (!progressive_set_log_context(codecs->progressive, codecs->context))
+			return FALSE;
 	}
 
 #ifdef WITH_GFX_H264

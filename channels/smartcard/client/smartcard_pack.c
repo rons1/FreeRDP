@@ -59,6 +59,18 @@ static LONG smartcard_unpack_redir_scard_handle_ref(SMARTCARD_DEVICE* smartcard,
 static LONG smartcard_pack_redir_scard_handle_ref(SMARTCARD_DEVICE* smartcard, wStream* s,
                                                   const REDIR_SCARDHANDLE* handle);
 
+static wLog* smartcard_get_log(SMARTCARD_DEVICE* smartcard)
+{
+	static wLog* log = NULL;
+	if (!log)
+		log = WLog_Get(TAG);
+
+	if (!WLog_IsLevelActive(log, g_LogLevel))
+		return NULL;
+	WLog_SetContext(log, smartcard->rdpcontext);
+	return log;
+}
+
 typedef enum
 {
 	NDR_PTR_FULL,
@@ -432,81 +444,78 @@ static char* smartcard_array_dump(const void* pd, size_t len, char* buffer, size
 fail:
 	return start;
 }
-static void smartcard_log_redir_handle(const char* tag, const REDIR_SCARDHANDLE* pHandle)
+static void smartcard_log_redir_handle(wLog* log, const REDIR_SCARDHANDLE* pHandle)
 {
 	char buffer[128];
 
-	WLog_LVL(tag, g_LogLevel, "  hContext: %s",
-	         smartcard_array_dump(pHandle->pbHandle, pHandle->cbHandle, buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, "  hContext: %s",
+	           smartcard_array_dump(pHandle->pbHandle, pHandle->cbHandle, buffer, sizeof(buffer)));
 }
 
-static void smartcard_log_context(const char* tag, const REDIR_SCARDCONTEXT* phContext)
+static void smartcard_log_context(wLog* log, const REDIR_SCARDCONTEXT* phContext)
 {
 	char buffer[128];
-	WLog_DBG(
-	    tag, "hContext: %s",
+	WLog_Print(
+	    log, WLOG_DEBUG, "hContext: %s",
 	    smartcard_array_dump(phContext->pbContext, phContext->cbContext, buffer, sizeof(buffer)));
 }
 
-static void smartcard_trace_context_and_string_call_a(const char* name,
+static void smartcard_trace_context_and_string_call_a(SMARTCARD_DEVICE* smartcard, const char* name,
                                                       const REDIR_SCARDCONTEXT* phContext,
                                                       const CHAR* sz)
 {
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "%s {", name);
-	smartcard_log_context(TAG, phContext);
-	WLog_LVL(TAG, g_LogLevel, "  sz=%s", sz);
+	WLog_Print(log, g_LogLevel, "%s {", name);
+	smartcard_log_context(log, phContext);
+	WLog_Print(log, g_LogLevel, "  sz=%s", sz);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
-static void smartcard_trace_context_and_string_call_w(const char* name,
+static void smartcard_trace_context_and_string_call_w(SMARTCARD_DEVICE* smartcard, const char* name,
                                                       const REDIR_SCARDCONTEXT* phContext,
                                                       const WCHAR* sz)
 {
 	char* tmp = NULL;
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "%s {", name);
-	smartcard_log_context(TAG, phContext);
+	WLog_Print(log, g_LogLevel, "%s {", name);
+	smartcard_log_context(log, phContext);
 	ConvertFromUnicode(CP_UTF8, 0, sz, -1, &tmp, 0, NULL, NULL);
-	WLog_LVL(TAG, g_LogLevel, "  sz=%s", tmp);
+	WLog_Print(log, g_LogLevel, "  sz=%s", tmp);
 	free(tmp);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_context_call(SMARTCARD_DEVICE* smartcard, const Context_Call* call,
                                          const char* name)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "%s_Call {", name);
+	smartcard_log_context(log, &call->hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "%s_Call {", name);
-	smartcard_log_context(TAG, &call->hContext);
-
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_list_reader_groups_call(SMARTCARD_DEVICE* smartcard,
                                                     const ListReaderGroups_Call* call, BOOL unicode)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "ListReaderGroups%S_Call {", unicode ? "W" : "A");
+	smartcard_log_context(log, &call->hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "ListReaderGroups%S_Call {", unicode ? "W" : "A");
-	smartcard_log_context(TAG, &call->hContext);
-
-	WLog_LVL(TAG, g_LogLevel, "fmszGroupsIsNULL: %" PRId32 " cchGroups: 0x%08" PRIx32,
-	         call->fmszGroupsIsNULL, call->cchGroups);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "fmszGroupsIsNULL: %" PRId32 " cchGroups: 0x%08" PRIx32,
+	           call->fmszGroupsIsNULL, call->cchGroups);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_status_change_w_call(SMARTCARD_DEVICE* smartcard,
@@ -516,36 +525,34 @@ static void smartcard_trace_get_status_change_w_call(SMARTCARD_DEVICE* smartcard
 	char* szEventState;
 	char* szCurrentState;
 	LPSCARD_READERSTATEW readerState;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "GetStatusChangeW_Call {");
+	smartcard_log_context(log, &call->hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "GetStatusChangeW_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-
-	WLog_LVL(TAG, g_LogLevel, "dwTimeOut: 0x%08" PRIX32 " cReaders: %" PRIu32 "", call->dwTimeOut,
-	         call->cReaders);
+	WLog_Print(log, g_LogLevel, "dwTimeOut: 0x%08" PRIX32 " cReaders: %" PRIu32 "", call->dwTimeOut,
+	           call->cReaders);
 
 	for (index = 0; index < call->cReaders; index++)
 	{
 		char* szReaderA = NULL;
 		readerState = &call->rgReaderStates[index];
 		ConvertFromUnicode(CP_UTF8, 0, readerState->szReader, -1, &szReaderA, 0, NULL, NULL);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
-		         szReaderA, readerState->cbAtr);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
+		           szReaderA, readerState->cbAtr);
 		szCurrentState = SCardGetReaderStateString(readerState->dwCurrentState);
 		szEventState = SCardGetReaderStateString(readerState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
-		         szCurrentState, readerState->dwCurrentState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
-		         szEventState, readerState->dwEventState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
+		           szCurrentState, readerState->dwCurrentState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
+		           szEventState, readerState->dwEventState);
 		free(szCurrentState);
 		free(szEventState);
 		free(szReaderA);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_list_reader_groups_return(SMARTCARD_DEVICE* smartcard,
@@ -553,18 +560,16 @@ static void smartcard_trace_list_reader_groups_return(SMARTCARD_DEVICE* smartcar
                                                       BOOL unicode)
 {
 	char* mszA = NULL;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
 	mszA = smartcard_convert_string_list(ret->msz, ret->cBytes, unicode);
 
-	WLog_LVL(TAG, g_LogLevel, "ListReaderGroups%s_Return {", unicode ? "W" : "A");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIx32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  cBytes: %" PRIu32 " msz: %s", ret->cBytes, mszA);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "ListReaderGroups%s_Return {", unicode ? "W" : "A");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIx32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  cBytes: %" PRIu32 " msz: %s", ret->cBytes, mszA);
+	WLog_Print(log, g_LogLevel, "}");
 	free(mszA);
 }
 
@@ -572,21 +577,20 @@ static void smartcard_trace_list_readers_call(SMARTCARD_DEVICE* smartcard,
                                               const ListReaders_Call* call, BOOL unicode)
 {
 	char* mszGroupsA = NULL;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
 	mszGroupsA = smartcard_convert_string_list(call->mszGroups, call->cBytes, unicode);
 
-	WLog_LVL(TAG, g_LogLevel, "ListReaders%s_Call {", unicode ? "W" : "A");
-	smartcard_log_context(TAG, &call->hContext);
+	WLog_Print(log, g_LogLevel, "ListReaders%s_Call {", unicode ? "W" : "A");
+	smartcard_log_context(log, &call->hContext);
 
-	WLog_LVL(TAG, g_LogLevel,
-	         "cBytes: %" PRIu32 " mszGroups: %s fmszReadersIsNULL: %" PRId32
-	         " cchReaders: 0x%08" PRIX32 "",
-	         call->cBytes, mszGroupsA, call->fmszReadersIsNULL, call->cchReaders);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "cBytes: %" PRIu32 " mszGroups: %s fmszReadersIsNULL: %" PRId32
+	           " cchReaders: 0x%08" PRIX32 "",
+	           call->cBytes, mszGroupsA, call->fmszReadersIsNULL, call->cchReaders);
+	WLog_Print(log, g_LogLevel, "}");
 
 	free(mszGroupsA);
 }
@@ -597,28 +601,25 @@ static void smartcard_trace_locate_cards_by_atr_a_call(SMARTCARD_DEVICE* smartca
 	UINT32 index;
 	char* szEventState;
 	char* szCurrentState;
-
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "LocateCardsByATRA_Call {");
-	smartcard_log_context(TAG, &call->hContext);
+	WLog_Print(log, g_LogLevel, "LocateCardsByATRA_Call {");
+	smartcard_log_context(log, &call->hContext);
 
 	for (index = 0; index < call->cReaders; index++)
 	{
 		char buffer[1024];
 		const LPSCARD_READERSTATEA readerState = &call->rgReaderStates[index];
 
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
-		         readerState->szReader, readerState->cbAtr);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
+		           readerState->szReader, readerState->cbAtr);
 		szCurrentState = SCardGetReaderStateString(readerState->dwCurrentState);
 		szEventState = SCardGetReaderStateString(readerState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
-		         szCurrentState, readerState->dwCurrentState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
-		         szEventState, readerState->dwEventState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
+		           szCurrentState, readerState->dwCurrentState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
+		           szEventState, readerState->dwEventState);
 
 		WLog_DBG(
 		    TAG, "\t[%" PRIu32 "]: cbAtr: %" PRIu32 " rgbAtr: %s", index, readerState->cbAtr,
@@ -628,142 +629,141 @@ static void smartcard_trace_locate_cards_by_atr_a_call(SMARTCARD_DEVICE* smartca
 		free(szEventState);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_locate_cards_a_call(SMARTCARD_DEVICE* smartcard,
                                                 const LocateCardsA_Call* call)
 {
 	char buffer[8192];
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "LocateCardsA_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	WLog_LVL(TAG, g_LogLevel, " cBytes=%" PRId32, call->cBytes);
-	WLog_LVL(TAG, g_LogLevel, " mszCards=%s",
-	         smartcard_msz_dump_a(call->mszCards, call->cBytes, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, " cReaders=%" PRId32, call->cReaders);
-	// WLog_LVL(TAG, g_LogLevel, " cReaders=%" PRId32, call->rgReaderStates);
+	WLog_Print(log, g_LogLevel, "LocateCardsA_Call {");
+	smartcard_log_context(log, &call->hContext);
+	WLog_Print(log, g_LogLevel, " cBytes=%" PRId32, call->cBytes);
+	WLog_Print(log, g_LogLevel, " mszCards=%s",
+	           smartcard_msz_dump_a(call->mszCards, call->cBytes, buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, " cReaders=%" PRId32, call->cReaders);
+	// WLog_Print(log, g_LogLevel, " cReaders=%" PRId32,
+	// call->rgReaderStates);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_locate_cards_return(SMARTCARD_DEVICE* smartcard,
                                                 const LocateCards_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "LocateCards_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "LocateCards_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
 	if (ret->ReturnCode == SCARD_S_SUCCESS)
 	{
-		WLog_LVL(TAG, g_LogLevel, "  cReaders=%" PRId32, ret->cReaders);
+		WLog_Print(log, g_LogLevel, "  cReaders=%" PRId32, ret->cReaders);
 	}
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_reader_icon_return(SMARTCARD_DEVICE* smartcard,
                                                    const GetReaderIcon_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetReaderIcon_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "GetReaderIcon_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
 	if (ret->ReturnCode == SCARD_S_SUCCESS)
 	{
-		WLog_LVL(TAG, g_LogLevel, "  cbDataLen=%" PRId32, ret->cbDataLen);
+		WLog_Print(log, g_LogLevel, "  cbDataLen=%" PRId32, ret->cbDataLen);
 	}
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_transmit_count_return(SMARTCARD_DEVICE* smartcard,
                                                       const GetTransmitCount_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
-	WLog_LVL(TAG, g_LogLevel, "  cTransmitCount=%" PRIu32, ret->cTransmitCount);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "  cTransmitCount=%" PRIu32, ret->cTransmitCount);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_read_cache_return(SMARTCARD_DEVICE* smartcard,
                                               const ReadCache_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "ReadCache_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "ReadCache_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
 	if (ret->ReturnCode == SCARD_S_SUCCESS)
 	{
 		char buffer[1024];
-		WLog_LVL(TAG, g_LogLevel, " cbDataLen=%" PRId32, ret->cbDataLen);
-		WLog_LVL(TAG, g_LogLevel, "  cbData: %s",
-		         smartcard_array_dump(ret->pbData, ret->cbDataLen, buffer, sizeof(buffer)));
+		WLog_Print(log, g_LogLevel, " cbDataLen=%" PRId32, ret->cbDataLen);
+		WLog_Print(log, g_LogLevel, "  cbData: %s",
+		           smartcard_array_dump(ret->pbData, ret->cbDataLen, buffer, sizeof(buffer)));
 	}
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_locate_cards_w_call(SMARTCARD_DEVICE* smartcard,
                                                 const LocateCardsW_Call* call)
 {
 	char buffer[8192];
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "LocateCardsW_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	WLog_LVL(TAG, g_LogLevel, " cBytes=%" PRId32, call->cBytes);
-	WLog_LVL(TAG, g_LogLevel, " sz2=%s",
-	         smartcard_msz_dump_w(call->mszCards, call->cBytes, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, " cReaders=%" PRId32, call->cReaders);
-	// WLog_LVL(TAG, g_LogLevel, " sz2=%s", call->rgReaderStates);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "LocateCardsW_Call {");
+	smartcard_log_context(log, &call->hContext);
+	WLog_Print(log, g_LogLevel, " cBytes=%" PRId32, call->cBytes);
+	WLog_Print(log, g_LogLevel, " sz2=%s",
+	           smartcard_msz_dump_w(call->mszCards, call->cBytes, buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, " cReaders=%" PRId32, call->cReaders);
+	// WLog_Print(log, g_LogLevel, " sz2=%s", call->rgReaderStates);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_list_readers_return(SMARTCARD_DEVICE* smartcard,
                                                 const ListReaders_Return* ret, BOOL unicode)
 {
 	char* mszA = NULL;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "ListReaders%s_Return {", unicode ? "W" : "A");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "ListReaders%s_Return {", unicode ? "W" : "A");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
 	if (ret->ReturnCode != SCARD_S_SUCCESS)
 	{
-		WLog_LVL(TAG, g_LogLevel, "}");
+		WLog_Print(log, g_LogLevel, "}");
 		return;
 	}
 
 	mszA = smartcard_convert_string_list(ret->msz, ret->cBytes, unicode);
 
-	WLog_LVL(TAG, g_LogLevel, "  cBytes: %" PRIu32 " msz: %s", ret->cBytes, mszA);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "  cBytes: %" PRIu32 " msz: %s", ret->cBytes, mszA);
+	WLog_Print(log, g_LogLevel, "}");
 	free(mszA);
 }
 
@@ -774,16 +774,14 @@ static void smartcard_trace_get_status_change_return(SMARTCARD_DEVICE* smartcard
 	UINT32 index;
 	char* szEventState;
 	char* szCurrentState;
-
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetStatusChange%s_Return {", unicode ? "W" : "A");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  cReaders: %" PRIu32 "", ret->cReaders);
+	WLog_Print(log, g_LogLevel, "GetStatusChange%s_Return {", unicode ? "W" : "A");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  cReaders: %" PRIu32 "", ret->cReaders);
 
 	for (index = 0; index < ret->cReaders; index++)
 	{
@@ -791,33 +789,33 @@ static void smartcard_trace_get_status_change_return(SMARTCARD_DEVICE* smartcard
 		const ReaderState_Return* rgReaderState = &(ret->rgReaderStates[index]);
 		szCurrentState = SCardGetReaderStateString(rgReaderState->dwCurrentState);
 		szEventState = SCardGetReaderStateString(rgReaderState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "    [%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
-		         szCurrentState, rgReaderState->dwCurrentState);
-		WLog_LVL(TAG, g_LogLevel, "    [%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
-		         szEventState, rgReaderState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "    [%" PRIu32 "]: cbAtr: %" PRIu32 " rgbAtr: %s", index,
-		         rgReaderState->cbAtr,
-		         smartcard_array_dump(rgReaderState->rgbAtr, rgReaderState->cbAtr, buffer,
-		                              sizeof(buffer)));
+		WLog_Print(log, g_LogLevel, "    [%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")",
+		           index, szCurrentState, rgReaderState->dwCurrentState);
+		WLog_Print(log, g_LogLevel, "    [%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
+		           szEventState, rgReaderState->dwEventState);
+		WLog_Print(log, g_LogLevel, "    [%" PRIu32 "]: cbAtr: %" PRIu32 " rgbAtr: %s", index,
+		           rgReaderState->cbAtr,
+		           smartcard_array_dump(rgReaderState->rgbAtr, rgReaderState->cbAtr, buffer,
+		                                sizeof(buffer)));
 		free(szCurrentState);
 		free(szEventState);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_context_and_two_strings_a_call(SMARTCARD_DEVICE* smartcard,
                                                            const ContextAndTwoStringA_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "ContextAndTwoStringW_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	WLog_LVL(TAG, g_LogLevel, " sz1=%s", call->sz1);
-	WLog_LVL(TAG, g_LogLevel, " sz2=%s", call->sz2);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "ContextAndTwoStringW_Call {");
+	smartcard_log_context(log, &call->hContext);
+	WLog_Print(log, g_LogLevel, " sz1=%s", call->sz1);
+	WLog_Print(log, g_LogLevel, " sz2=%s", call->sz2);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_context_and_two_strings_w_call(SMARTCARD_DEVICE* smartcard,
@@ -825,59 +823,55 @@ static void smartcard_trace_context_and_two_strings_w_call(SMARTCARD_DEVICE* sma
 {
 	CHAR* sz1 = NULL;
 	CHAR* sz2 = NULL;
-
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "ContextAndTwoStringW_Call {");
-	smartcard_log_context(TAG, &call->hContext);
+	WLog_Print(log, g_LogLevel, "ContextAndTwoStringW_Call {");
+	smartcard_log_context(log, &call->hContext);
 	ConvertFromUnicode(CP_UTF8, 0, call->sz1, -1, &sz1, 0, NULL, NULL);
 	ConvertFromUnicode(CP_UTF8, 0, call->sz2, -1, &sz2, 0, NULL, NULL);
-	WLog_LVL(TAG, g_LogLevel, " sz1=%s", sz1);
-	WLog_LVL(TAG, g_LogLevel, " sz2=%s", sz2);
+	WLog_Print(log, g_LogLevel, " sz1=%s", sz1);
+	WLog_Print(log, g_LogLevel, " sz2=%s", sz2);
 	free(sz1);
 	free(sz2);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_transmit_count_call(SMARTCARD_DEVICE* smartcard,
                                                     const GetTransmitCount_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_write_cache_a_call(SMARTCARD_DEVICE* smartcard,
                                                const WriteCacheA_Call* call)
 {
 	char buffer[1024];
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Call {");
 
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Call {");
+	WLog_Print(log, g_LogLevel, "  szLookupName=%s", call->szLookupName);
 
-	WLog_LVL(TAG, g_LogLevel, "  szLookupName=%s", call->szLookupName);
-
-	smartcard_log_context(TAG, &call->Common.hContext);
+	smartcard_log_context(log, &call->Common.hContext);
 	WLog_DBG(
 	    TAG, "..CardIdentifier=%s",
 	    smartcard_array_dump(call->Common.CardIdentifier, sizeof(UUID), buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
-	WLog_LVL(TAG, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
+	WLog_Print(log, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
+	WLog_Print(log, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
 	WLog_DBG(
 	    TAG, "  pbData=%s",
 	    smartcard_array_dump(call->Common.pbData, call->Common.cbDataLen, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_write_cache_w_call(SMARTCARD_DEVICE* smartcard,
@@ -885,47 +879,45 @@ static void smartcard_trace_write_cache_w_call(SMARTCARD_DEVICE* smartcard,
 {
 	char* tmp = NULL;
 	char buffer[1024];
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Call {");
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Call {");
 
 	ConvertFromUnicode(CP_UTF8, 0, call->szLookupName, -1, &tmp, 0, NULL, NULL);
-	WLog_LVL(TAG, g_LogLevel, "  szLookupName=%s", tmp);
+	WLog_Print(log, g_LogLevel, "  szLookupName=%s", tmp);
 	free(tmp);
-	smartcard_log_context(TAG, &call->Common.hContext);
+	smartcard_log_context(log, &call->Common.hContext);
 	WLog_DBG(
 	    TAG, "..CardIdentifier=%s",
 	    smartcard_array_dump(call->Common.CardIdentifier, sizeof(UUID), buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
-	WLog_LVL(TAG, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
+	WLog_Print(log, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
+	WLog_Print(log, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
 	WLog_DBG(
 	    TAG, "  pbData=%s",
 	    smartcard_array_dump(call->Common.pbData, call->Common.cbDataLen, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_read_cache_a_call(SMARTCARD_DEVICE* smartcard,
                                               const ReadCacheA_Call* call)
 {
 	char buffer[1024];
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Call {");
 
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Call {");
-
-	WLog_LVL(TAG, g_LogLevel, "  szLookupName=%s", call->szLookupName);
-	smartcard_log_context(TAG, &call->Common.hContext);
+	WLog_Print(log, g_LogLevel, "  szLookupName=%s", call->szLookupName);
+	smartcard_log_context(log, &call->Common.hContext);
 	WLog_DBG(
 	    TAG, "..CardIdentifier=%s",
 	    smartcard_array_dump(call->Common.CardIdentifier, sizeof(UUID), buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
-	WLog_LVL(TAG, g_LogLevel, "  fPbDataIsNULL=%" PRId32, call->Common.fPbDataIsNULL);
-	WLog_LVL(TAG, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
+	WLog_Print(log, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
+	WLog_Print(log, g_LogLevel, "  fPbDataIsNULL=%" PRId32, call->Common.fPbDataIsNULL);
+	WLog_Print(log, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_read_cache_w_call(SMARTCARD_DEVICE* smartcard,
@@ -933,94 +925,91 @@ static void smartcard_trace_read_cache_w_call(SMARTCARD_DEVICE* smartcard,
 {
 	char* tmp = NULL;
 	char buffer[1024];
-	WINPR_UNUSED(smartcard);
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "GetTransmitCount_Call {");
+	WLog_Print(log, g_LogLevel, "GetTransmitCount_Call {");
 
 	ConvertFromUnicode(CP_UTF8, 0, call->szLookupName, -1, &tmp, 0, NULL, NULL);
-	WLog_LVL(TAG, g_LogLevel, "  szLookupName=%s", tmp);
+	WLog_Print(log, g_LogLevel, "  szLookupName=%s", tmp);
 	free(tmp);
-	smartcard_log_context(TAG, &call->Common.hContext);
+	smartcard_log_context(log, &call->Common.hContext);
 	WLog_DBG(
 	    TAG, "..CardIdentifier=%s",
 	    smartcard_array_dump(call->Common.CardIdentifier, sizeof(UUID), buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
-	WLog_LVL(TAG, g_LogLevel, "  fPbDataIsNULL=%" PRId32, call->Common.fPbDataIsNULL);
-	WLog_LVL(TAG, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
+	WLog_Print(log, g_LogLevel, "  FreshnessCounter=%" PRIu32, call->Common.FreshnessCounter);
+	WLog_Print(log, g_LogLevel, "  fPbDataIsNULL=%" PRId32, call->Common.fPbDataIsNULL);
+	WLog_Print(log, g_LogLevel, "  cbDataLen=%" PRIu32, call->Common.cbDataLen);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_transmit_call(SMARTCARD_DEVICE* smartcard, const Transmit_Call* call)
 {
 	UINT32 cbExtraBytes;
 	BYTE* pbExtraBytes;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "Transmit_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
+	WLog_Print(log, g_LogLevel, "Transmit_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
 	if (call->pioSendPci)
 	{
 		cbExtraBytes = (UINT32)(call->pioSendPci->cbPciLength - sizeof(SCARD_IO_REQUEST));
 		pbExtraBytes = &((BYTE*)call->pioSendPci)[sizeof(SCARD_IO_REQUEST)];
-		WLog_LVL(TAG, g_LogLevel, "pioSendPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
-		         call->pioSendPci->dwProtocol, cbExtraBytes);
+		WLog_Print(log, g_LogLevel, "pioSendPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
+		           call->pioSendPci->dwProtocol, cbExtraBytes);
 
 		if (cbExtraBytes)
 		{
 			char buffer[1024];
-			WLog_LVL(TAG, g_LogLevel, "pbExtraBytes: %s",
-			         smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
+			WLog_Print(log, g_LogLevel, "pbExtraBytes: %s",
+			           smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
 		}
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "pioSendPci: null");
+		WLog_Print(log, g_LogLevel, "pioSendPci: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "cbSendLength: %" PRIu32 "", call->cbSendLength);
+	WLog_Print(log, g_LogLevel, "cbSendLength: %" PRIu32 "", call->cbSendLength);
 
 	if (call->pbSendBuffer)
 	{
 		char buffer[1024];
-		WLog_DBG(
-		    TAG, "pbSendBuffer: %s",
+		WLog_Print(
+		    log, WLOG_DEBUG, "pbSendBuffer: %s",
 		    smartcard_array_dump(call->pbSendBuffer, call->cbSendLength, buffer, sizeof(buffer)));
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "pbSendBuffer: null");
+		WLog_Print(log, g_LogLevel, "pbSendBuffer: null");
 	}
 
 	if (call->pioRecvPci)
 	{
 		cbExtraBytes = (UINT32)(call->pioRecvPci->cbPciLength - sizeof(SCARD_IO_REQUEST));
 		pbExtraBytes = &((BYTE*)call->pioRecvPci)[sizeof(SCARD_IO_REQUEST)];
-		WLog_LVL(TAG, g_LogLevel, "pioRecvPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
-		         call->pioRecvPci->dwProtocol, cbExtraBytes);
+		WLog_Print(log, g_LogLevel, "pioRecvPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
+		           call->pioRecvPci->dwProtocol, cbExtraBytes);
 
 		if (cbExtraBytes)
 		{
 			char buffer[1024];
-			WLog_LVL(TAG, g_LogLevel, "pbExtraBytes: %s",
-			         smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
+			WLog_Print(log, g_LogLevel, "pbExtraBytes: %s",
+			           smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
 		}
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "pioRecvPci: null");
+		WLog_Print(log, g_LogLevel, "pioRecvPci: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "fpbRecvBufferIsNULL: %" PRId32 " cbRecvLength: %" PRIu32 "",
-	         call->fpbRecvBufferIsNULL, call->cbRecvLength);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "fpbRecvBufferIsNULL: %" PRId32 " cbRecvLength: %" PRIu32 "",
+	           call->fpbRecvBufferIsNULL, call->cbRecvLength);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_locate_cards_by_atr_w_call(SMARTCARD_DEVICE* smartcard,
@@ -1029,14 +1018,11 @@ static void smartcard_trace_locate_cards_by_atr_w_call(SMARTCARD_DEVICE* smartca
 	UINT32 index;
 	char* szEventState;
 	char* szCurrentState;
-
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "LocateCardsByATRW_Call {");
-	smartcard_log_context(TAG, &call->hContext);
+	WLog_Print(log, g_LogLevel, "LocateCardsByATRW_Call {");
+	smartcard_log_context(log, &call->hContext);
 
 	for (index = 0; index < call->cReaders; index++)
 	{
@@ -1046,14 +1032,14 @@ static void smartcard_trace_locate_cards_by_atr_w_call(SMARTCARD_DEVICE* smartca
 		    (const LPSCARD_READERSTATEW)&call->rgReaderStates[index];
 
 		ConvertFromUnicode(CP_UTF8, 0, readerState->szReader, -1, &tmp, 0, NULL, NULL);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index, tmp,
-		         readerState->cbAtr);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index, tmp,
+		           readerState->cbAtr);
 		szCurrentState = SCardGetReaderStateString(readerState->dwCurrentState);
 		szEventState = SCardGetReaderStateString(readerState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
-		         szCurrentState, readerState->dwCurrentState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
-		         szEventState, readerState->dwEventState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
+		           szCurrentState, readerState->dwCurrentState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
+		           szEventState, readerState->dwEventState);
 
 		WLog_DBG(
 		    TAG, "\t[%" PRIu32 "]: cbAtr: %" PRIu32 " rgbAtr: %s", index, readerState->cbAtr,
@@ -1064,42 +1050,41 @@ static void smartcard_trace_locate_cards_by_atr_w_call(SMARTCARD_DEVICE* smartca
 		free(tmp);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_transmit_return(SMARTCARD_DEVICE* smartcard, const Transmit_Return* ret)
 {
 	UINT32 cbExtraBytes;
 	BYTE* pbExtraBytes;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "Transmit_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "Transmit_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
 
 	if (ret->pioRecvPci)
 	{
 		cbExtraBytes = (UINT32)(ret->pioRecvPci->cbPciLength - sizeof(SCARD_IO_REQUEST));
 		pbExtraBytes = &((BYTE*)ret->pioRecvPci)[sizeof(SCARD_IO_REQUEST)];
-		WLog_LVL(TAG, g_LogLevel, "  pioRecvPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
-		         ret->pioRecvPci->dwProtocol, cbExtraBytes);
+		WLog_Print(log, g_LogLevel,
+		           "  pioRecvPci: dwProtocol: %" PRIu32 " cbExtraBytes: %" PRIu32 "",
+		           ret->pioRecvPci->dwProtocol, cbExtraBytes);
 
 		if (cbExtraBytes)
 		{
 			char buffer[1024];
-			WLog_LVL(TAG, g_LogLevel, "  pbExtraBytes: %s",
-			         smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
+			WLog_Print(log, g_LogLevel, "  pbExtraBytes: %s",
+			           smartcard_array_dump(pbExtraBytes, cbExtraBytes, buffer, sizeof(buffer)));
 		}
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "  pioRecvPci: null");
+		WLog_Print(log, g_LogLevel, "  pioRecvPci: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "  cbRecvLength: %" PRIu32 "", ret->cbRecvLength);
+	WLog_Print(log, g_LogLevel, "  cbRecvLength: %" PRIu32 "", ret->cbRecvLength);
 
 	if (ret->pbRecvBuffer)
 	{
@@ -1110,23 +1095,21 @@ static void smartcard_trace_transmit_return(SMARTCARD_DEVICE* smartcard, const T
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "  pbRecvBuffer: null");
+		WLog_Print(log, g_LogLevel, "  pbRecvBuffer: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_control_return(SMARTCARD_DEVICE* smartcard, const Control_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "Control_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  cbOutBufferSize: %" PRIu32 "", ret->cbOutBufferSize);
+	WLog_Print(log, g_LogLevel, "Control_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  cbOutBufferSize: %" PRIu32 "", ret->cbOutBufferSize);
 
 	if (ret->pvOutBuffer)
 	{
@@ -1137,28 +1120,26 @@ static void smartcard_trace_control_return(SMARTCARD_DEVICE* smartcard, const Co
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "pvOutBuffer: null");
+		WLog_Print(log, g_LogLevel, "pvOutBuffer: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_control_call(SMARTCARD_DEVICE* smartcard, const Control_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "Control_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "Control_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-
-	WLog_LVL(TAG, g_LogLevel,
-	         "dwControlCode: 0x%08" PRIX32 " cbInBufferSize: %" PRIu32
-	         " fpvOutBufferIsNULL: %" PRId32 " cbOutBufferSize: %" PRIu32 "",
-	         call->dwControlCode, call->cbInBufferSize, call->fpvOutBufferIsNULL,
-	         call->cbOutBufferSize);
+	WLog_Print(log, g_LogLevel,
+	           "dwControlCode: 0x%08" PRIX32 " cbInBufferSize: %" PRIu32
+	           " fpvOutBufferIsNULL: %" PRId32 " cbOutBufferSize: %" PRIu32 "",
+	           call->dwControlCode, call->cbInBufferSize, call->fpvOutBufferIsNULL,
+	           call->cbOutBufferSize);
 
 	if (call->pvInBuffer)
 	{
@@ -1169,47 +1150,45 @@ static void smartcard_trace_control_call(SMARTCARD_DEVICE* smartcard, const Cont
 	}
 	else
 	{
-		WLog_LVL(TAG, g_LogLevel, "pvInBuffer: null");
+		WLog_Print(log, g_LogLevel, "pvInBuffer: null");
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_set_attrib_call(SMARTCARD_DEVICE* smartcard, const SetAttrib_Call* call)
 {
 	char buffer[8192];
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetAttrib_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-	WLog_LVL(TAG, g_LogLevel, "dwAttrId: 0x%08" PRIX32, call->dwAttrId);
-	WLog_LVL(TAG, g_LogLevel, "cbAttrLen: 0x%08" PRId32, call->cbAttrLen);
-	WLog_LVL(TAG, g_LogLevel, "pbAttr: %s",
-	         smartcard_array_dump(call->pbAttr, call->cbAttrLen, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "GetAttrib_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
+	WLog_Print(log, g_LogLevel, "dwAttrId: 0x%08" PRIX32, call->dwAttrId);
+	WLog_Print(log, g_LogLevel, "cbAttrLen: 0x%08" PRId32, call->cbAttrLen);
+	WLog_Print(log, g_LogLevel, "pbAttr: %s",
+	           smartcard_array_dump(call->pbAttr, call->cbAttrLen, buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_attrib_return(SMARTCARD_DEVICE* smartcard,
                                               const GetAttrib_Return* ret, DWORD dwAttrId)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetAttrib_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  dwAttrId: %s (0x%08" PRIX32 ") cbAttrLen: 0x%08" PRIX32 "",
-	         SCardGetAttributeString(dwAttrId), dwAttrId, ret->cbAttrLen);
+	WLog_Print(log, g_LogLevel, "GetAttrib_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  dwAttrId: %s (0x%08" PRIX32 ") cbAttrLen: 0x%08" PRIX32 "",
+	           SCardGetAttributeString(dwAttrId), dwAttrId, ret->cbAttrLen);
 
 	if (dwAttrId == SCARD_ATTR_VENDOR_NAME)
 	{
-		WLog_LVL(TAG, g_LogLevel, "  pbAttr: %.*s", ret->cbAttrLen, (char*)ret->pbAttr);
+		WLog_Print(log, g_LogLevel, "  pbAttr: %.*s", ret->cbAttrLen, (char*)ret->pbAttr);
 	}
 	else if (dwAttrId == SCARD_ATTR_CURRENT_PROTOCOL_TYPE)
 	{
@@ -1218,47 +1197,44 @@ static void smartcard_trace_get_attrib_return(SMARTCARD_DEVICE* smartcard,
 			DWORD* pd;
 		} attr;
 		attr.pb = ret->pbAttr;
-		WLog_LVL(TAG, g_LogLevel, "  dwProtocolType: %s (0x%08" PRIX32 ")",
-		         SCardGetProtocolString(*attr.pd), *attr.pd);
+		WLog_Print(log, g_LogLevel, "  dwProtocolType: %s (0x%08" PRIX32 ")",
+		           SCardGetProtocolString(*attr.pd), *attr.pd);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_get_attrib_call(SMARTCARD_DEVICE* smartcard, const GetAttrib_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "GetAttrib_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "GetAttrib_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-
-	WLog_LVL(TAG, g_LogLevel,
-	         "dwAttrId: %s (0x%08" PRIX32 ") fpbAttrIsNULL: %" PRId32 " cbAttrLen: 0x%08" PRIX32 "",
-	         SCardGetAttributeString(call->dwAttrId), call->dwAttrId, call->fpbAttrIsNULL,
-	         call->cbAttrLen);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "dwAttrId: %s (0x%08" PRIX32 ") fpbAttrIsNULL: %" PRId32 " cbAttrLen: 0x%08" PRIX32
+	           "",
+	           SCardGetAttributeString(call->dwAttrId), call->dwAttrId, call->fpbAttrIsNULL,
+	           call->cbAttrLen);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_status_call(SMARTCARD_DEVICE* smartcard, const Status_Call* call,
                                         BOOL unicode)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "Status%s_Call {", unicode ? "W" : "A");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "Status%s_Call {", unicode ? "W" : "A");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-
-	WLog_LVL(TAG, g_LogLevel,
-	         "fmszReaderNamesIsNULL: %" PRId32 " cchReaderLen: %" PRIu32 " cbAtrLen: %" PRIu32 "",
-	         call->fmszReaderNamesIsNULL, call->cchReaderLen, call->cbAtrLen);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "fmszReaderNamesIsNULL: %" PRId32 " cchReaderLen: %" PRIu32 " cbAtrLen: %" PRIu32 "",
+	           call->fmszReaderNamesIsNULL, call->cchReaderLen, call->cbAtrLen);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_status_return(SMARTCARD_DEVICE* smartcard, const Status_Return* ret,
@@ -1266,104 +1242,92 @@ static void smartcard_trace_status_return(SMARTCARD_DEVICE* smartcard, const Sta
 {
 	char* mszReaderNamesA = NULL;
 	char buffer[1024];
-
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
 	mszReaderNamesA = smartcard_convert_string_list(ret->mszReaderNames, ret->cBytes, unicode);
 
-	WLog_LVL(TAG, g_LogLevel, "Status%s_Return {", unicode ? "W" : "A");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  dwState: %s (0x%08" PRIX32 ") dwProtocol: %s (0x%08" PRIX32 ")",
-	         SCardGetCardStateString(ret->dwState), ret->dwState,
-	         SCardGetProtocolString(ret->dwProtocol), ret->dwProtocol);
+	WLog_Print(log, g_LogLevel, "Status%s_Return {", unicode ? "W" : "A");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  dwState: %s (0x%08" PRIX32 ") dwProtocol: %s (0x%08" PRIX32 ")",
+	           SCardGetCardStateString(ret->dwState), ret->dwState,
+	           SCardGetProtocolString(ret->dwProtocol), ret->dwProtocol);
 
-	WLog_LVL(TAG, g_LogLevel, "  cBytes: %" PRIu32 " mszReaderNames: %s", ret->cBytes,
-	         mszReaderNamesA);
+	WLog_Print(log, g_LogLevel, "  cBytes: %" PRIu32 " mszReaderNames: %s", ret->cBytes,
+	           mszReaderNamesA);
 
-	WLog_LVL(TAG, g_LogLevel, "  cbAtrLen: %" PRIu32 " pbAtr: %s", ret->cbAtrLen,
-	         smartcard_array_dump(ret->pbAtr, ret->cbAtrLen, buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "  cbAtrLen: %" PRIu32 " pbAtr: %s", ret->cbAtrLen,
+	           smartcard_array_dump(ret->pbAtr, ret->cbAtrLen, buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, "}");
 	free(mszReaderNamesA);
 }
 
 static void smartcard_trace_state_return(SMARTCARD_DEVICE* smartcard, const State_Return* ret)
 {
 	char buffer[1024];
-
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "Reconnect_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  dwState:    %s (0x%08" PRIX32 ")", ret->dwState);
-	WLog_LVL(TAG, g_LogLevel, "  dwProtocol: %s (0x%08" PRIX32 ")", ret->dwProtocol);
-	WLog_LVL(TAG, g_LogLevel, "  cbAtrLen:   %s (0x%08" PRIX32 ")", ret->cbAtrLen);
-	WLog_LVL(TAG, g_LogLevel, "  rgAtr:      %s",
-	         smartcard_array_dump(ret->rgAtr, sizeof(ret->rgAtr), buffer, sizeof(buffer)));
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "Reconnect_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  dwState:    %s (0x%08" PRIX32 ")", ret->dwState);
+	WLog_Print(log, g_LogLevel, "  dwProtocol: %s (0x%08" PRIX32 ")", ret->dwProtocol);
+	WLog_Print(log, g_LogLevel, "  cbAtrLen:   %s (0x%08" PRIX32 ")", ret->cbAtrLen);
+	WLog_Print(log, g_LogLevel, "  rgAtr:      %s",
+	           smartcard_array_dump(ret->rgAtr, sizeof(ret->rgAtr), buffer, sizeof(buffer)));
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_reconnect_return(SMARTCARD_DEVICE* smartcard,
                                              const Reconnect_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
-	WLog_LVL(TAG, g_LogLevel, "Reconnect_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  dwActiveProtocol: %s (0x%08" PRIX32 ")",
-	         SCardGetProtocolString(ret->dwActiveProtocol), ret->dwActiveProtocol);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "Reconnect_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  dwActiveProtocol: %s (0x%08" PRIX32 ")",
+	           SCardGetProtocolString(ret->dwActiveProtocol), ret->dwActiveProtocol);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_connect_a_call(SMARTCARD_DEVICE* smartcard, const ConnectA_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "ConnectA_Call {");
+	smartcard_log_context(log, &call->Common.hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "ConnectA_Call {");
-	smartcard_log_context(TAG, &call->Common.hContext);
-
-	WLog_LVL(TAG, g_LogLevel,
-	         "szReader: %s dwShareMode: %s (0x%08" PRIX32 ") dwPreferredProtocols: %s (0x%08" PRIX32
-	         ")",
-	         call->szReader, SCardGetShareModeString(call->Common.dwShareMode),
-	         call->Common.dwShareMode, SCardGetProtocolString(call->Common.dwPreferredProtocols),
-	         call->Common.dwPreferredProtocols);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "szReader: %s dwShareMode: %s (0x%08" PRIX32
+	           ") dwPreferredProtocols: %s (0x%08" PRIX32 ")",
+	           call->szReader, SCardGetShareModeString(call->Common.dwShareMode),
+	           call->Common.dwShareMode, SCardGetProtocolString(call->Common.dwPreferredProtocols),
+	           call->Common.dwPreferredProtocols);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_connect_w_call(SMARTCARD_DEVICE* smartcard, const ConnectW_Call* call)
 {
 	char* szReaderA = NULL;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
-
 	ConvertFromUnicode(CP_UTF8, 0, call->szReader, -1, &szReaderA, 0, NULL, NULL);
-	WLog_LVL(TAG, g_LogLevel, "ConnectW_Call {");
-	smartcard_log_context(TAG, &call->Common.hContext);
+	WLog_Print(log, g_LogLevel, "ConnectW_Call {");
+	smartcard_log_context(log, &call->Common.hContext);
 
-	WLog_LVL(TAG, g_LogLevel,
-	         "szReader: %s dwShareMode: %s (0x%08" PRIX32 ") dwPreferredProtocols: %s (0x%08" PRIX32
-	         ")",
-	         szReaderA, SCardGetShareModeString(call->Common.dwShareMode), call->Common.dwShareMode,
-	         SCardGetProtocolString(call->Common.dwPreferredProtocols),
-	         call->Common.dwPreferredProtocols);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "szReader: %s dwShareMode: %s (0x%08" PRIX32
+	           ") dwPreferredProtocols: %s (0x%08" PRIX32 ")",
+	           szReaderA, SCardGetShareModeString(call->Common.dwShareMode),
+	           call->Common.dwShareMode, SCardGetProtocolString(call->Common.dwPreferredProtocols),
+	           call->Common.dwPreferredProtocols);
+	WLog_Print(log, g_LogLevel, "}");
 	free(szReaderA);
 }
 
@@ -1371,116 +1335,108 @@ static void smartcard_trace_hcard_and_disposition_call(SMARTCARD_DEVICE* smartca
                                                        const HCardAndDisposition_Call* call,
                                                        const char* name)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
+	WLog_Print(log, g_LogLevel, "%s_Call {", name);
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "%s_Call {", name);
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
-
-	WLog_LVL(TAG, g_LogLevel, "dwDisposition: %s (0x%08" PRIX32 ")",
-	         SCardGetDispositionString(call->dwDisposition), call->dwDisposition);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "dwDisposition: %s (0x%08" PRIX32 ")",
+	           SCardGetDispositionString(call->dwDisposition), call->dwDisposition);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_establish_context_call(SMARTCARD_DEVICE* smartcard,
                                                    const EstablishContext_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "EstablishContext_Call {");
-	WLog_LVL(TAG, g_LogLevel, "dwScope: %s (0x%08" PRIX32 ")", SCardGetScopeString(call->dwScope),
-	         call->dwScope);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "EstablishContext_Call {");
+	WLog_Print(log, g_LogLevel, "dwScope: %s (0x%08" PRIX32 ")", SCardGetScopeString(call->dwScope),
+	           call->dwScope);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_establish_context_return(SMARTCARD_DEVICE* smartcard,
                                                      const EstablishContext_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "EstablishContext_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	smartcard_log_context(TAG, &ret->hContext);
+	WLog_Print(log, g_LogLevel, "EstablishContext_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	smartcard_log_context(log, &ret->hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 void smartcard_trace_long_return(SMARTCARD_DEVICE* smartcard, const Long_Return* ret,
                                  const char* name)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "%s_Return {", name);
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "%s_Return {", name);
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_connect_return(SMARTCARD_DEVICE* smartcard, const Connect_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "Connect_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	smartcard_log_context(TAG, &ret->hContext);
-	smartcard_log_redir_handle(TAG, &ret->hCard);
+	WLog_Print(log, g_LogLevel, "Connect_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	smartcard_log_context(log, &ret->hContext);
+	smartcard_log_redir_handle(log, &ret->hCard);
 
-	WLog_LVL(TAG, g_LogLevel, "  dwActiveProtocol: %s (0x%08" PRIX32 ")",
-	         SCardGetProtocolString(ret->dwActiveProtocol), ret->dwActiveProtocol);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "  dwActiveProtocol: %s (0x%08" PRIX32 ")",
+	           SCardGetProtocolString(ret->dwActiveProtocol), ret->dwActiveProtocol);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 void smartcard_trace_reconnect_call(SMARTCARD_DEVICE* smartcard, const Reconnect_Call* call)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "Reconnect_Call {");
-	smartcard_log_context(TAG, &call->hContext);
-	smartcard_log_redir_handle(TAG, &call->hCard);
+	WLog_Print(log, g_LogLevel, "Reconnect_Call {");
+	smartcard_log_context(log, &call->hContext);
+	smartcard_log_redir_handle(log, &call->hCard);
 
-	WLog_LVL(TAG, g_LogLevel,
-	         "dwShareMode: %s (0x%08" PRIX32 ") dwPreferredProtocols: %s (0x%08" PRIX32
-	         ") dwInitialization: %s (0x%08" PRIX32 ")",
-	         SCardGetShareModeString(call->dwShareMode), call->dwShareMode,
-	         SCardGetProtocolString(call->dwPreferredProtocols), call->dwPreferredProtocols,
-	         SCardGetDispositionString(call->dwInitialization), call->dwInitialization);
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel,
+	           "dwShareMode: %s (0x%08" PRIX32 ") dwPreferredProtocols: %s (0x%08" PRIX32
+	           ") dwInitialization: %s (0x%08" PRIX32 ")",
+	           SCardGetShareModeString(call->dwShareMode), call->dwShareMode,
+	           SCardGetProtocolString(call->dwPreferredProtocols), call->dwPreferredProtocols,
+	           SCardGetDispositionString(call->dwInitialization), call->dwInitialization);
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static void smartcard_trace_device_type_id_return(SMARTCARD_DEVICE* smartcard,
                                                   const GetDeviceTypeId_Return* ret)
 {
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetDeviceTypeId_Return {");
-	WLog_LVL(TAG, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
-	         SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
-	WLog_LVL(TAG, g_LogLevel, "  dwDeviceId=%08" PRIx32, ret->dwDeviceId);
+	WLog_Print(log, g_LogLevel, "GetDeviceTypeId_Return {");
+	WLog_Print(log, g_LogLevel, "  ReturnCode: %s (0x%08" PRIX32 ")",
+	           SCardGetErrorString(ret->ReturnCode), ret->ReturnCode);
+	WLog_Print(log, g_LogLevel, "  dwDeviceId=%08" PRIx32, ret->dwDeviceId);
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static LONG smartcard_unpack_common_context_and_string_a(SMARTCARD_DEVICE* smartcard, wStream* s,
@@ -1504,7 +1460,7 @@ static LONG smartcard_unpack_common_context_and_string_a(SMARTCARD_DEVICE* smart
 	if (status != SCARD_S_SUCCESS)
 		return status;
 
-	smartcard_trace_context_and_string_call_a(__FUNCTION__, phContext, *pszReaderName);
+	smartcard_trace_context_and_string_call_a(smartcard, __FUNCTION__, phContext, *pszReaderName);
 	return SCARD_S_SUCCESS;
 }
 
@@ -1530,7 +1486,7 @@ static LONG smartcard_unpack_common_context_and_string_w(SMARTCARD_DEVICE* smart
 	if (status != SCARD_S_SUCCESS)
 		return status;
 
-	smartcard_trace_context_and_string_call_w(__FUNCTION__, phContext, *pszReaderName);
+	smartcard_trace_context_and_string_call_w(smartcard, __FUNCTION__, phContext, *pszReaderName);
 	return SCARD_S_SUCCESS;
 }
 
@@ -2317,33 +2273,32 @@ static void smartcard_trace_get_status_change_a_call(SMARTCARD_DEVICE* smartcard
 	char* szEventState;
 	char* szCurrentState;
 	LPSCARD_READERSTATEA readerState;
-	WINPR_UNUSED(smartcard);
-
-	if (!WLog_IsLevelActive(WLog_Get(TAG), g_LogLevel))
+	wLog* log = smartcard_get_log(smartcard);
+	if (!log)
 		return;
 
-	WLog_LVL(TAG, g_LogLevel, "GetStatusChangeA_Call {");
-	smartcard_log_context(TAG, &call->hContext);
+	WLog_Print(log, g_LogLevel, "GetStatusChangeA_Call {");
+	smartcard_log_context(log, &call->hContext);
 
-	WLog_LVL(TAG, g_LogLevel, "dwTimeOut: 0x%08" PRIX32 " cReaders: %" PRIu32 "", call->dwTimeOut,
-	         call->cReaders);
+	WLog_Print(log, g_LogLevel, "dwTimeOut: 0x%08" PRIX32 " cReaders: %" PRIu32 "", call->dwTimeOut,
+	           call->cReaders);
 
 	for (index = 0; index < call->cReaders; index++)
 	{
 		readerState = &call->rgReaderStates[index];
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
-		         readerState->szReader, readerState->cbAtr);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: szReader: %s cbAtr: %" PRIu32 "", index,
+		           readerState->szReader, readerState->cbAtr);
 		szCurrentState = SCardGetReaderStateString(readerState->dwCurrentState);
 		szEventState = SCardGetReaderStateString(readerState->dwEventState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
-		         szCurrentState, readerState->dwCurrentState);
-		WLog_LVL(TAG, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
-		         szEventState, readerState->dwEventState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwCurrentState: %s (0x%08" PRIX32 ")", index,
+		           szCurrentState, readerState->dwCurrentState);
+		WLog_Print(log, g_LogLevel, "\t[%" PRIu32 "]: dwEventState: %s (0x%08" PRIX32 ")", index,
+		           szEventState, readerState->dwEventState);
 		free(szCurrentState);
 		free(szEventState);
 	}
 
-	WLog_LVL(TAG, g_LogLevel, "}");
+	WLog_Print(log, g_LogLevel, "}");
 }
 
 static LONG smartcard_unpack_reader_state_a(wStream* s, LPSCARD_READERSTATEA* ppcReaders,

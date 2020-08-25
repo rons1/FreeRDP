@@ -1155,6 +1155,9 @@ rdpTransport* transport_new(rdpContext* context)
 	if (!transport->log)
 		goto out_free_transport;
 
+	if (!WLog_SetContext(transport->log, context))
+		goto out_free_transport;
+
 	transport->context = context;
 	transport->settings = context->settings;
 	transport->ReceivePool = StreamPool_New(TRUE, BUFFER_SIZE);

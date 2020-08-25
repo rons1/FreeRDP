@@ -1162,7 +1162,9 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS pEntryPoints, PVOID p
 		context->rdpcontext = pEntryPointsEx->context;
 	}
 
-	cliprdr->log = WLog_Get("com.freerdp.channels.cliprdr.client");
+	cliprdr->log = WLog_Get(TAG);
+	WLog_SetContext(cliprdr->log, pEntryPointsEx->context);
+
 	WLog_Print(cliprdr->log, WLOG_DEBUG, "VirtualChannelEntryEx");
 	CopyMemory(&(cliprdr->channelEntryPoints), pEntryPoints,
 	           sizeof(CHANNEL_ENTRY_POINTS_FREERDP_EX));

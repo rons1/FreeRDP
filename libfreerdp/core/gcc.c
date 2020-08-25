@@ -1258,7 +1258,8 @@ BOOL gcc_read_server_security_data(wStream* s, rdpMcs* mcs)
 	data = settings->ServerCertificate;
 	length = settings->ServerCertificateLength;
 
-	if (!certificate_read_server_certificate(settings->RdpServerCertificate, data, length))
+	if (!certificate_read_server_certificate(settings->RdpServerCertificate,
+	                                         ((freerdp*)settings->instance)->context, data, length))
 		goto fail;
 
 	return TRUE;

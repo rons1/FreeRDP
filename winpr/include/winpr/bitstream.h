@@ -160,8 +160,10 @@ extern "C"
 		return (_bs->length - _bs->position);
 	}
 
-	WINPR_API void BitDump(const char* tag, UINT32 level, const BYTE* buffer, UINT32 length,
-	                       UINT32 flags);
+	WINPR_API WINPR_DEPRECATED(void BitDump(const char* tag, UINT32 level, const BYTE* buffer,
+	                                        UINT32 length, UINT32 flags));
+	WINPR_API void BitDumpEx(const char* tag, const void* context, UINT32 level, const BYTE* buffer,
+	                         UINT32 length, UINT32 flags);
 	WINPR_API UINT32 ReverseBits32(UINT32 bits, UINT32 nbits);
 
 	WINPR_API void BitStream_Attach(wBitStream* bs, const BYTE* buffer, UINT32 capacity);

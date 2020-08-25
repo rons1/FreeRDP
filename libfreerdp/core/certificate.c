@@ -494,7 +494,8 @@ static BOOL certificate_process_server_public_signature(rdpCertificate* certific
  * @param s stream
  */
 
-static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* certificate, wStream* s)
+static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* certificate,
+                                                            rdpContext* context, wStream* s)
 {
 	UINT32 dwSigAlgId;
 	UINT32 dwKeyAlgId;
@@ -515,10 +516,10 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
 
 	if (!((dwSigAlgId == SIGNATURE_ALG_RSA) && (dwKeyAlgId == KEY_EXCHANGE_ALG_RSA)))
 	{
-		WLog_ERR(TAG,
-		         "unsupported signature or key algorithm, dwSigAlgId=%" PRIu32
-		         " dwKeyAlgId=%" PRIu32 "",
-		         dwSigAlgId, dwKeyAlgId);
+		WLogEx_ERR(TAG, context,
+		           "unsupported signature or key algorithm, dwSigAlgId=%" PRIu32
+		           " dwKeyAlgId=%" PRIu32 "",
+		           dwSigAlgId, dwKeyAlgId);
 		return FALSE;
 	}
 
@@ -526,7 +527,8 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
 
 	if (wPublicKeyBlobType != BB_RSA_KEY_BLOB)
 	{
-		WLog_ERR(TAG, "unsupported public key blob type %" PRIu16 "", wPublicKeyBlobType);
+		WLogEx_ERR(TAG, context, "unsupported public key blob type %" PRIu16 "",
+		           wPublicKeyBlobType);
 		return FALSE;
 	}
 
@@ -534,13 +536,14 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
 
 	if (Stream_GetRemainingLength(s) < wPublicKeyBlobLen)
 	{
-		WLog_ERR(TAG, "not enough bytes for public key(len=%" PRIu16 ")", wPublicKeyBlobLen);
+		WLogEx_ERR(TAG, context, "not enough bytes for public key(len=%" PRIu16 ")",
+		           wPublicKeyBlobLen);
 		return FALSE;
 	}
 
 	if (!certificate_process_server_public_key(certificate, s, wPublicKeyBlobLen))
 	{
-		WLog_ERR(TAG, "error in server public key");
+		WLogEx_ERR(TAG, context, "error in server public key");
 		return FALSE;
 	}
 
@@ -552,7 +555,7 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
 
 	if (wSignatureBlobType != BB_RSA_SIGNATURE_BLOB)
 	{
-		WLog_ERR(TAG, "unsupported blob signature %" PRIu16 "", wSignatureBlobType);
+		WLogEx_ERR(TAG, context, "unsupported blob signature %" PRIu16 "", wSignatureBlobType);
 		return FALSE;
 	}
 
@@ -560,20 +563,22 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
 
 	if (Stream_GetRemainingLength(s) < wSignatureBlobLen)
 	{
-		WLog_ERR(TAG, "not enough bytes for signature(len=%" PRIu16 ")", wSignatureBlobLen);
+		WLogEx_ERR(TAG, context, "not enough bytes for signature(len=%" PRIu16 ")",
+		           wSignatureBlobLen);
 		return FALSE;
 	}
 
 	if (wSignatureBlobLen != 72)
 	{
-		WLog_ERR(TAG, "invalid signature length (got %" PRIu16 ", expected 72)", wSignatureBlobLen);
+		WLogEx_ERR(TAG, context, "invalid signature length (got %" PRIu16 ", expected 72)",
+		           wSignatureBlobLen);
 		return FALSE;
 	}
 
 	if (!certificate_process_server_public_signature(certificate, sigdata, sigdatalen, s,
 	                                                 wSignatureBlobLen))
 	{
-		WLog_ERR(TAG, "unable to parse server public signature");
+		WLogEx_ERR(TAG, context, "unable to parse server public signature");
 		return FALSE;
 	}
 
@@ -586,13 +591,14 @@ static BOOL certificate_read_server_proprietary_certificate(rdpCertificate* cert
  * @param s stream
  */
 
-static BOOL certificate_read_server_x509_certificate_chain(rdpCertificate* certificate, wStream* s)
+static BOOL certificate_read_server_x509_certificate_chain(rdpCertificate* certificate,
+                                                           rdpContext* context, wStream* s)
 {
 	UINT32 i;
 	BOOL ret;
 	UINT32 certLength;
 	UINT32 numCertBlobs;
-	DEBUG_CERTIFICATE("Server X.509 Certificate Chain");
+	DEBUG_CERTIFICATE(context, "Server X.509 Certificate Chain");
 
 	if (Stream_GetRemainingLength(s) < 4)
 		return FALSE;
@@ -613,7 +619,7 @@ static BOOL certificate_read_server_x509_certificate_chain(rdpCertificate* certi
 		if (Stream_GetRemainingLength(s) < certLength)
 			return FALSE;
 
-		DEBUG_CERTIFICATE("X.509 Certificate #%d, length:%" PRIu32 "", i + 1, certLength);
+		DEBUG_CERTIFICATE(context, "X.509 Certificate #%d, length:%" PRIu32 "", i + 1, certLength);
 		certificate->x509_cert_chain->array[i].data = (BYTE*)malloc(certLength);
 
 		if (!certificate->x509_cert_chain->array[i].data)
@@ -625,29 +631,31 @@ static BOOL certificate_read_server_x509_certificate_chain(rdpCertificate* certi
 		if ((numCertBlobs - i) == 2)
 		{
 			rdpCertInfo cert_info = { 0 };
-			DEBUG_CERTIFICATE("License Server Certificate");
+			DEBUG_CERTIFICATE(context, "License Server Certificate");
 			ret = certificate_read_x509_certificate(&certificate->x509_cert_chain->array[i],
 			                                        &cert_info);
-			DEBUG_LICENSE("modulus length:%" PRIu32 "", cert_info.ModulusLength);
+			DEBUG_LICENSE(context, "modulus length:%" PRIu32 "", cert_info.ModulusLength);
 			free(cert_info.Modulus);
 
 			if (!ret)
 			{
-				WLog_ERR(TAG, "failed to read License Server, content follows:");
-				winpr_HexDump(TAG, WLOG_ERROR, certificate->x509_cert_chain->array[i].data,
-				              certificate->x509_cert_chain->array[i].length);
+				WLogEx_ERR(TAG, context, "failed to read License Server, content follows:");
+				winpr_HexDumpEx(TAG, context, WLOG_ERROR,
+				                certificate->x509_cert_chain->array[i].data,
+				                certificate->x509_cert_chain->array[i].length);
 				return FALSE;
 			}
 		}
 		else if (numCertBlobs - i == 1)
 		{
-			DEBUG_CERTIFICATE("Terminal Server Certificate");
+			DEBUG_CERTIFICATE(context, "Terminal Server Certificate");
 
 			if (!certificate_read_x509_certificate(&certificate->x509_cert_chain->array[i],
 			                                       &certificate->cert_info))
 				return FALSE;
 
-			DEBUG_CERTIFICATE("modulus length:%" PRIu32 "", certificate->cert_info.ModulusLength);
+			DEBUG_CERTIFICATE(context, "modulus length:%" PRIu32 "",
+			                  certificate->cert_info.ModulusLength);
 		}
 	}
 
@@ -661,8 +669,8 @@ static BOOL certificate_read_server_x509_certificate_chain(rdpCertificate* certi
  * @param length certificate length
  */
 
-BOOL certificate_read_server_certificate(rdpCertificate* certificate, BYTE* server_cert,
-                                         size_t length)
+BOOL certificate_read_server_certificate(rdpCertificate* certificate, rdpContext* context,
+                                         BYTE* server_cert, size_t length)
 {
 	BOOL ret;
 	wStream* s;
@@ -675,7 +683,7 @@ BOOL certificate_read_server_certificate(rdpCertificate* certificate, BYTE* serv
 
 	if (!s)
 	{
-		WLog_ERR(TAG, "Stream_New failed!");
+		WLogEx_ERR(TAG, context, "Stream_New failed!");
 		return FALSE;
 	}
 
@@ -684,16 +692,16 @@ BOOL certificate_read_server_certificate(rdpCertificate* certificate, BYTE* serv
 	switch (dwVersion & CERT_CHAIN_VERSION_MASK)
 	{
 		case CERT_CHAIN_VERSION_1:
-			ret = certificate_read_server_proprietary_certificate(certificate, s);
+			ret = certificate_read_server_proprietary_certificate(certificate, context, s);
 			break;
 
 		case CERT_CHAIN_VERSION_2:
-			ret = certificate_read_server_x509_certificate_chain(certificate, s);
+			ret = certificate_read_server_x509_certificate_chain(certificate, context, s);
 			break;
 
 		default:
-			WLog_ERR(TAG, "invalid certificate chain version:%" PRIu32 "",
-			         dwVersion & CERT_CHAIN_VERSION_MASK);
+			WLogEx_ERR(TAG, context, "invalid certificate chain version:%" PRIu32 "",
+			           dwVersion & CERT_CHAIN_VERSION_MASK);
 			ret = FALSE;
 			break;
 	}

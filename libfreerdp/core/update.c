@@ -2909,8 +2909,12 @@ rdpUpdate* update_new(rdpRdp* rdp)
 	if (!update)
 		return NULL;
 
-	update->log = WLog_Get("com.freerdp.core.update");
 	InitializeCriticalSection(&(update->mux));
+
+	update->log = WLog_Get(TAG);
+	if (!WLog_SetContext(update->log, rdp->context))
+		goto fail;
+
 	update->pointer = (rdpPointerUpdate*)calloc(1, sizeof(rdpPointerUpdate));
 
 	if (!update->pointer)

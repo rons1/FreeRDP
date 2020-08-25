@@ -218,7 +218,7 @@ RFX_CONTEXT* rfx_context_new(BOOL encoder)
 	if (!priv)
 		goto error_priv;
 
-	priv->log = WLog_Get("com.freerdp.codec.rfx");
+	priv->log = WLog_Get(TAG);
 	WLog_OpenAppender(priv->log);
 #ifdef WITH_DEBUG_RFX
 	WLog_SetLogLevel(priv->log, WLOG_DEBUG);
@@ -373,8 +373,9 @@ void rfx_context_free(RFX_CONTEXT* context)
 		free(priv->workObjects);
 		free(priv->tileWorkParams);
 #ifdef WITH_PROFILER
-		WLog_VRB(TAG,
-		         "WARNING: Profiling results probably unusable with multithreaded RemoteFX codec!");
+		WLog_Print(
+		    priv->log, WLOG_TRACE,
+		    "WARNING: Profiling results probably unusable with multithreaded RemoteFX codec!");
 #endif
 	}
 
@@ -1878,4 +1879,11 @@ BOOL rfx_compose_message(RFX_CONTEXT* context, wStream* s, const RFX_RECT* rects
 	message->freeRects = TRUE;
 	rfx_message_free(context, message);
 	return ret;
+}
+
+BOOL rfx_set_log_context(RFX_CONTEXT* context, const void* userdata)
+{
+	if (!context || !context->priv)
+		return FALSE;
+	return WLog_SetContext(context->priv->log, userdata);
 }

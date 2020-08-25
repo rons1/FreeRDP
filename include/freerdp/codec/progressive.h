@@ -56,6 +56,8 @@ extern "C"
 	FREERDP_API PROGRESSIVE_CONTEXT* progressive_context_new(BOOL Compressor);
 	FREERDP_API void progressive_context_free(PROGRESSIVE_CONTEXT* progressive);
 
+	FREERDP_API BOOL progressive_set_log_context(PROGRESSIVE_CONTEXT* progressive, void* context);
+
 #ifdef __cplusplus
 }
 #endif

@@ -32,8 +32,6 @@
 #include <freerdp/crypto/per.h>
 #include <freerdp/log.h>
 
-#define TAG FREERDP_TAG("core.rdp")
-
 const char* DATA_PDU_TYPE_STRINGS[80] = {
 	"?",
 	"?",      /* 0x00 - 0x01 */
@@ -336,7 +334,7 @@ BOOL rdp_set_error_info(rdpRdp* rdp, UINT32 errorInfo)
 			}
 		}
 		else
-			WLog_ERR(TAG, "%s missing context=%p", __FUNCTION__, context);
+			WLog_Print(rdp->log, WLOG_ERROR, "%s missing context=%p", __FUNCTION__, context);
 	}
 	else
 	{
@@ -452,7 +450,7 @@ BOOL rdp_read_header(rdpRdp* rdp, wStream* s, UINT16* length, UINT16* channelId)
 				rdp_set_error_info(rdp, ERRINFO_RPC_INITIATED_DISCONNECT);
 		}
 
-		WLog_DBG(TAG, "DisconnectProviderUltimatum: reason: %d", reason);
+		WLog_Print(rdp->log, WLOG_DEBUG, "DisconnectProviderUltimatum: reason: %d", reason);
 		freerdp_abort_connect(rdp->instance);
 		EventArgsInit(&e, "freerdp");
 		e.code = 0;
@@ -708,8 +706,9 @@ BOOL rdp_send_data_pdu(rdpRdp* rdp, wStream* s, BYTE type, UINT16 channel_id)
 	length += pad;
 	Stream_SetPosition(s, length);
 	Stream_SealLength(s);
-	WLog_DBG(TAG, "%s: sending data (type=0x%x size=%" PRIuz " channelId=%" PRIu16 ")",
-	         __FUNCTION__, type, Stream_Length(s), channel_id);
+	WLog_Print(rdp->log, WLOG_DEBUG,
+	           "%s: sending data (type=0x%x size=%" PRIuz " channelId=%" PRIu16 ")", __FUNCTION__,
+	           type, Stream_Length(s), channel_id);
 
 	rdp->outPackets++;
 	if (transport_write(rdp->transport, s) < 0)
@@ -811,7 +810,7 @@ static BOOL rdp_recv_server_auto_reconnect_status_pdu(rdpRdp* rdp, wStream* s)
 		return FALSE;
 
 	Stream_Read_UINT32(s, arcStatus); /* arcStatus (4 bytes) */
-	WLog_WARN(TAG, "AutoReconnectStatus: 0x%08" PRIX32 "", arcStatus);
+	WLog_Print(rdp->log, WLOG_WARN, "AutoReconnectStatus: 0x%08" PRIX32 "", arcStatus);
 	return TRUE;
 }
 
@@ -877,7 +876,7 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 	if (!rdp_read_share_data_header(s, &length, &type, &shareId, &compressedType,
 	                                &compressedLength))
 	{
-		WLog_ERR(TAG, "rdp_read_share_data_header() failed");
+		WLog_Print(rdp->log, WLOG_ERROR, "rdp_read_share_data_header() failed");
 		return -1;
 	}
 
@@ -891,8 +890,9 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 
 		if ((compressedLength < 18) || (Stream_GetRemainingLength(s) < SrcSize))
 		{
-			WLog_ERR(TAG, "bulk_decompress: not enough bytes for compressedLength %" PRIu16 "",
-			         compressedLength);
+			WLog_Print(rdp->log, WLOG_ERROR,
+			           "bulk_decompress: not enough bytes for compressedLength %" PRIu16 "",
+			           compressedLength);
 			return -1;
 		}
 
@@ -901,7 +901,7 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		{
 			if (!(cs = StreamPool_Take(rdp->transport->ReceivePool, DstSize)))
 			{
-				WLog_ERR(TAG, "Couldn't take stream from pool");
+				WLog_Print(rdp->log, WLOG_ERROR, "Couldn't take stream from pool");
 				return -1;
 			}
 
@@ -912,23 +912,23 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		}
 		else
 		{
-			WLog_ERR(TAG, "bulk_decompress() failed");
+			WLog_Print(rdp->log, WLOG_ERROR, "bulk_decompress() failed");
 			return -1;
 		}
 
 		Stream_Seek(s, SrcSize);
 	}
 
-	WLog_DBG(TAG, "recv %s Data PDU (0x%02" PRIX8 "), length: %" PRIu16 "",
-	         type < ARRAYSIZE(DATA_PDU_TYPE_STRINGS) ? DATA_PDU_TYPE_STRINGS[type] : "???", type,
-	         length);
+	WLog_Print(rdp->log, WLOG_DEBUG, "recv %s Data PDU (0x%02" PRIX8 "), length: %" PRIu16 "",
+	           type < ARRAYSIZE(DATA_PDU_TYPE_STRINGS) ? DATA_PDU_TYPE_STRINGS[type] : "???", type,
+	           length);
 
 	switch (type)
 	{
 		case DATA_PDU_TYPE_UPDATE:
 			if (!update_recv(rdp->update, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_UPDATE - update_recv() failed");
+				WLog_Print(rdp->log, WLOG_ERROR, "DATA_PDU_TYPE_UPDATE - update_recv() failed");
 				goto out_fail;
 			}
 
@@ -937,7 +937,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_CONTROL:
 			if (!rdp_recv_server_control_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_CONTROL - rdp_recv_server_control_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_CONTROL - rdp_recv_server_control_pdu() failed");
 				goto out_fail;
 			}
 
@@ -946,7 +947,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_POINTER:
 			if (!update_recv_pointer(rdp->update, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_POINTER - update_recv_pointer() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_POINTER - update_recv_pointer() failed");
 				goto out_fail;
 			}
 
@@ -955,7 +957,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SYNCHRONIZE:
 			if (!rdp_recv_synchronize_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_SYNCHRONIZE - rdp_recv_synchronize_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_SYNCHRONIZE - rdp_recv_synchronize_pdu() failed");
 				goto out_fail;
 			}
 
@@ -964,7 +967,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_PLAY_SOUND:
 			if (!update_recv_play_sound(rdp->update, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_PLAY_SOUND - update_recv_play_sound() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_PLAY_SOUND - update_recv_play_sound() failed");
 				goto out_fail;
 			}
 
@@ -973,8 +977,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SHUTDOWN_DENIED:
 			if (!rdp_recv_server_shutdown_denied_pdu(rdp, cs))
 			{
-				WLog_ERR(
-				    TAG,
+				WLog_Print(
+				    rdp->log, WLOG_ERROR,
 				    "DATA_PDU_TYPE_SHUTDOWN_DENIED - rdp_recv_server_shutdown_denied_pdu() failed");
 				goto out_fail;
 			}
@@ -984,8 +988,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SAVE_SESSION_INFO:
 			if (!rdp_recv_save_session_info(rdp, cs))
 			{
-				WLog_ERR(TAG,
-				         "DATA_PDU_TYPE_SAVE_SESSION_INFO - rdp_recv_save_session_info() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_SAVE_SESSION_INFO - rdp_recv_save_session_info() failed");
 				goto out_fail;
 			}
 
@@ -994,7 +998,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_FONT_MAP:
 			if (!rdp_recv_font_map_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_FONT_MAP - rdp_recv_font_map_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_FONT_MAP - rdp_recv_font_map_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1003,8 +1008,9 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SET_KEYBOARD_INDICATORS:
 			if (!rdp_recv_server_set_keyboard_indicators_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_SET_KEYBOARD_INDICATORS - "
-				              "rdp_recv_server_set_keyboard_indicators_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_SET_KEYBOARD_INDICATORS - "
+				           "rdp_recv_server_set_keyboard_indicators_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1013,8 +1019,9 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SET_KEYBOARD_IME_STATUS:
 			if (!rdp_recv_server_set_keyboard_ime_status_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_SET_KEYBOARD_IME_STATUS - "
-				              "rdp_recv_server_set_keyboard_ime_status_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_SET_KEYBOARD_IME_STATUS - "
+				           "rdp_recv_server_set_keyboard_ime_status_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1023,8 +1030,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_SET_ERROR_INFO:
 			if (!rdp_recv_set_error_info_data_pdu(rdp, cs))
 			{
-				WLog_ERR(
-				    TAG,
+				WLog_Print(
+				    rdp->log, WLOG_ERROR,
 				    "DATA_PDU_TYPE_SET_ERROR_INFO - rdp_recv_set_error_info_data_pdu() failed");
 				goto out_fail;
 			}
@@ -1034,8 +1041,9 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_ARC_STATUS:
 			if (!rdp_recv_server_auto_reconnect_status_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG, "DATA_PDU_TYPE_ARC_STATUS - "
-				              "rdp_recv_server_auto_reconnect_status_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_ARC_STATUS - "
+				           "rdp_recv_server_auto_reconnect_status_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1044,8 +1052,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_STATUS_INFO:
 			if (!rdp_recv_server_status_info_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG,
-				         "DATA_PDU_TYPE_STATUS_INFO - rdp_recv_server_status_info_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_STATUS_INFO - rdp_recv_server_status_info_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1054,8 +1062,8 @@ int rdp_recv_data_pdu(rdpRdp* rdp, wStream* s)
 		case DATA_PDU_TYPE_MONITOR_LAYOUT:
 			if (!rdp_recv_monitor_layout_pdu(rdp, cs))
 			{
-				WLog_ERR(TAG,
-				         "DATA_PDU_TYPE_MONITOR_LAYOUT - rdp_recv_monitor_layout_pdu() failed");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "DATA_PDU_TYPE_MONITOR_LAYOUT - rdp_recv_monitor_layout_pdu() failed");
 				goto out_fail;
 			}
 
@@ -1198,13 +1206,13 @@ BOOL rdp_decrypt(rdpRdp* rdp, wStream* s, UINT16* pLength, UINT16 securityFlags)
 
 		if (!security_fips_decrypt(Stream_Pointer(s), length, rdp))
 		{
-			WLog_ERR(TAG, "FATAL: cannot decrypt");
+			WLog_Print(rdp->log, WLOG_ERROR, "FATAL: cannot decrypt");
 			return FALSE; /* TODO */
 		}
 
 		if (!security_fips_check_signature(Stream_Pointer(s), length - pad, sig, rdp))
 		{
-			WLog_ERR(TAG, "FATAL: invalid packet signature");
+			WLog_Print(rdp->log, WLOG_ERROR, "FATAL: invalid packet signature");
 			return FALSE; /* TODO */
 		}
 
@@ -1235,7 +1243,7 @@ BOOL rdp_decrypt(rdpRdp* rdp, wStream* s, UINT16* pLength, UINT16 securityFlags)
 
 	if (memcmp(wmac, cmac, sizeof(wmac)) != 0)
 	{
-		WLog_ERR(TAG, "WARNING: invalid packet signature");
+		WLog_Print(rdp->log, WLOG_ERROR, "WARNING: invalid packet signature");
 		/*
 		 * Because Standard RDP Security is totally broken,
 		 * and cannot protect against MITM, don't treat signature
@@ -1294,7 +1302,7 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 
 	if (!rdp_read_header(rdp, s, &length, &channelId))
 	{
-		WLog_ERR(TAG, "Incorrect RDP header.");
+		WLog_Print(rdp->log, WLOG_ERROR, "Incorrect RDP header.");
 		return -1;
 	}
 
@@ -1310,7 +1318,7 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 	{
 		if (!rdp_read_security_header(s, &securityFlags, &length))
 		{
-			WLog_ERR(TAG, "rdp_recv_tpkt_pdu: rdp_read_security_header() fail");
+			WLog_Print(rdp->log, WLOG_ERROR, "rdp_recv_tpkt_pdu: rdp_read_security_header() fail");
 			return -1;
 		}
 
@@ -1318,7 +1326,7 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 		{
 			if (!rdp_decrypt(rdp, s, &length, securityFlags))
 			{
-				WLog_ERR(TAG, "rdp_decrypt failed");
+				WLog_Print(rdp->log, WLOG_ERROR, "rdp_decrypt failed");
 				return -1;
 			}
 		}
@@ -1347,7 +1355,8 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 
 			if (!rdp_read_share_control_header(s, NULL, &remain, &pduType, &pduSource))
 			{
-				WLog_ERR(TAG, "rdp_recv_tpkt_pdu: rdp_read_share_control_header() fail");
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "rdp_recv_tpkt_pdu: rdp_read_share_control_header() fail");
 				return -1;
 			}
 
@@ -1369,7 +1378,8 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 				case PDU_TYPE_DEACTIVATE_ALL:
 					if (!rdp_recv_deactivate_all(rdp, &sub))
 					{
-						WLog_ERR(TAG, "rdp_recv_tpkt_pdu: rdp_recv_deactivate_all() fail");
+						WLog_Print(rdp->log, WLOG_ERROR,
+						           "rdp_recv_tpkt_pdu: rdp_recv_deactivate_all() fail");
 						return -1;
 					}
 
@@ -1381,24 +1391,25 @@ static int rdp_recv_tpkt_pdu(rdpRdp* rdp, wStream* s)
 				case PDU_TYPE_FLOW_RESPONSE:
 				case PDU_TYPE_FLOW_STOP:
 				case PDU_TYPE_FLOW_TEST:
-					WLog_DBG(TAG, "flow message 0x%04" PRIX16 "", pduType);
+					WLog_Print(rdp->log, WLOG_DEBUG, "flow message 0x%04" PRIX16 "", pduType);
 					/* http://msdn.microsoft.com/en-us/library/cc240576.aspx */
 					if (!Stream_SafeSeek(&sub, remain))
 						return -1;
 					break;
 
 				default:
-					WLog_ERR(TAG, "incorrect PDU type: 0x%04" PRIX16 "", pduType);
+					WLog_Print(rdp->log, WLOG_ERROR, "incorrect PDU type: 0x%04" PRIX16 "",
+					           pduType);
 					break;
 			}
 
 			diff = Stream_GetRemainingLength(&sub);
 			if (diff > 0)
 			{
-				WLog_WARN(TAG,
-				          "pduType %s not properly parsed, %" PRIdz
-				          " bytes remaining unhandled. Skipping.",
-				          pdu_type_to_str(pduType), diff);
+				WLog_Print(rdp->log, WLOG_WARN,
+				           "pduType %s not properly parsed, %" PRIdz
+				           " bytes remaining unhandled. Skipping.",
+				           pdu_type_to_str(pduType), diff);
 			}
 		}
 	}
@@ -1432,13 +1443,14 @@ static int rdp_recv_fastpath_pdu(rdpRdp* rdp, wStream* s)
 
 	if (!fastpath_read_header_rdp(fastpath, s, &length))
 	{
-		WLog_ERR(TAG, "rdp_recv_fastpath_pdu: fastpath_read_header_rdp() fail");
+		WLog_Print(rdp->log, WLOG_ERROR, "rdp_recv_fastpath_pdu: fastpath_read_header_rdp() fail");
 		return -1;
 	}
 
 	if ((length == 0) || (length > Stream_GetRemainingLength(s)))
 	{
-		WLog_ERR(TAG, "incorrect FastPath PDU header length %" PRIu16 "", length);
+		WLog_Print(rdp->log, WLOG_ERROR, "incorrect FastPath PDU header length %" PRIu16 "",
+		           length);
 		return -1;
 	}
 
@@ -1454,7 +1466,7 @@ static int rdp_recv_fastpath_pdu(rdpRdp* rdp, wStream* s)
 
 		if (!rdp_decrypt(rdp, s, &length, flags))
 		{
-			WLog_ERR(TAG, "rdp_recv_fastpath_pdu: rdp_decrypt() fail");
+			WLog_Print(rdp->log, WLOG_ERROR, "rdp_recv_fastpath_pdu: rdp_decrypt() fail");
 			return -1;
 		}
 	}
@@ -1494,8 +1506,8 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 			{
 				if (nla_recv_pdu(rdp->nla, s) < 1)
 				{
-					WLog_ERR(TAG, "%s: %s - nla_recv_pdu() fail", __FUNCTION__,
-					         rdp_server_connection_state_string(rdp->state));
+					WLog_Print(rdp->log, WLOG_ERROR, "%s: %s - nla_recv_pdu() fail", __FUNCTION__,
+					           rdp_server_connection_state_string(rdp->state));
 					return -1;
 				}
 			}
@@ -1505,8 +1517,8 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 
 				if (nego_get_state(rdp->nego) != NEGO_STATE_FINAL)
 				{
-					WLog_ERR(TAG, "%s: %s - nego_recv() fail", __FUNCTION__,
-					         rdp_server_connection_state_string(rdp->state));
+					WLog_Print(rdp->log, WLOG_ERROR, "%s: %s - nego_recv() fail", __FUNCTION__,
+					           rdp_server_connection_state_string(rdp->state));
 					return -1;
 				}
 
@@ -1545,8 +1557,8 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 
 				if (!mcs_client_begin(rdp->mcs))
 				{
-					WLog_ERR(TAG, "%s: %s - mcs_client_begin() fail", __FUNCTION__,
-					         rdp_server_connection_state_string(rdp->state));
+					WLog_Print(rdp->log, WLOG_ERROR, "%s: %s - mcs_client_begin() fail",
+					           __FUNCTION__, rdp_server_connection_state_string(rdp->state));
 					return -1;
 				}
 			}
@@ -1556,19 +1568,19 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 		case CONNECTION_STATE_MCS_CONNECT:
 			if (!mcs_recv_connect_response(rdp->mcs, s))
 			{
-				WLog_ERR(TAG, "mcs_recv_connect_response failure");
+				WLog_Print(rdp->log, WLOG_ERROR, "mcs_recv_connect_response failure");
 				return -1;
 			}
 
 			if (!mcs_send_erect_domain_request(rdp->mcs))
 			{
-				WLog_ERR(TAG, "mcs_send_erect_domain_request failure");
+				WLog_Print(rdp->log, WLOG_ERROR, "mcs_send_erect_domain_request failure");
 				return -1;
 			}
 
 			if (!mcs_send_attach_user_request(rdp->mcs))
 			{
-				WLog_ERR(TAG, "mcs_send_attach_user_request failure");
+				WLog_Print(rdp->log, WLOG_ERROR, "mcs_send_attach_user_request failure");
 				return -1;
 			}
 
@@ -1578,13 +1590,13 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 		case CONNECTION_STATE_MCS_ATTACH_USER:
 			if (!mcs_recv_attach_user_confirm(rdp->mcs, s))
 			{
-				WLog_ERR(TAG, "mcs_recv_attach_user_confirm failure");
+				WLog_Print(rdp->log, WLOG_ERROR, "mcs_recv_attach_user_confirm failure");
 				return -1;
 			}
 
 			if (!mcs_send_channel_join_request(rdp->mcs, rdp->mcs->userId))
 			{
-				WLog_ERR(TAG, "mcs_send_channel_join_request failure");
+				WLog_Print(rdp->log, WLOG_ERROR, "mcs_send_channel_join_request failure");
 				return -1;
 			}
 
@@ -1594,10 +1606,10 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 		case CONNECTION_STATE_MCS_CHANNEL_JOIN:
 			if (!rdp_client_connect_mcs_channel_join_confirm(rdp, s))
 			{
-				WLog_ERR(TAG,
-				         "%s: %s - "
-				         "rdp_client_connect_mcs_channel_join_confirm() fail",
-				         __FUNCTION__, rdp_server_connection_state_string(rdp->state));
+				WLog_Print(rdp->log, WLOG_ERROR,
+				           "%s: %s - "
+				           "rdp_client_connect_mcs_channel_join_confirm() fail",
+				           __FUNCTION__, rdp_server_connection_state_string(rdp->state));
 				status = -1;
 			}
 
@@ -1607,8 +1619,8 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 			status = rdp_client_connect_license(rdp, s);
 
 			if (status < 0)
-				WLog_DBG(TAG, "%s: %s - rdp_client_connect_license() - %i", __FUNCTION__,
-				         rdp_server_connection_state_string(rdp->state), status);
+				WLog_Print(rdp->log, WLOG_DEBUG, "%s: %s - rdp_client_connect_license() - %i",
+				           __FUNCTION__, rdp_server_connection_state_string(rdp->state), status);
 
 			break;
 
@@ -1616,10 +1628,10 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 			status = rdp_client_connect_demand_active(rdp, s);
 
 			if (status < 0)
-				WLog_DBG(TAG,
-				         "%s: %s - "
-				         "rdp_client_connect_demand_active() - %i",
-				         __FUNCTION__, rdp_server_connection_state_string(rdp->state), status);
+				WLog_Print(rdp->log, WLOG_DEBUG,
+				           "%s: %s - "
+				           "rdp_client_connect_demand_active() - %i",
+				           __FUNCTION__, rdp_server_connection_state_string(rdp->state), status);
 
 			break;
 
@@ -1638,8 +1650,8 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 			}
 
 			if (status < 0)
-				WLog_DBG(TAG, "%s: %s - rdp_recv_pdu() - %i", __FUNCTION__,
-				         rdp_server_connection_state_string(rdp->state), status);
+				WLog_Print(rdp->log, WLOG_DEBUG, "%s: %s - rdp_recv_pdu() - %i", __FUNCTION__,
+				           rdp_server_connection_state_string(rdp->state), status);
 
 			break;
 
@@ -1647,14 +1659,14 @@ int rdp_recv_callback(rdpTransport* transport, wStream* s, void* extra)
 			status = rdp_recv_pdu(rdp, s);
 
 			if (status < 0)
-				WLog_DBG(TAG, "%s: %s - rdp_recv_pdu() - %i", __FUNCTION__,
-				         rdp_server_connection_state_string(rdp->state), status);
+				WLog_Print(rdp->log, WLOG_DEBUG, "%s: %s - rdp_recv_pdu() - %i", __FUNCTION__,
+				           rdp_server_connection_state_string(rdp->state), status);
 
 			break;
 
 		default:
-			WLog_ERR(TAG, "%s: %s state %d", __FUNCTION__,
-			         rdp_server_connection_state_string(rdp->state), rdp->state);
+			WLog_Print(rdp->log, WLOG_ERROR, "%s: %s state %d", __FUNCTION__,
+			           rdp_server_connection_state_string(rdp->state), rdp->state);
 			status = -1;
 			break;
 	}
@@ -1696,7 +1708,7 @@ int rdp_check_fds(rdpRdp* rdp)
 
 		if (!tsg_check_event_handles(tsg))
 		{
-			WLog_ERR(TAG, "rdp_check_fds: tsg_check_event_handles()");
+			WLog_Print(rdp->log, WLOG_ERROR, "rdp_check_fds: tsg_check_event_handles()");
 			return -1;
 		}
 
@@ -1713,7 +1725,7 @@ int rdp_check_fds(rdpRdp* rdp)
 	}
 
 	if (status < 0)
-		WLog_DBG(TAG, "transport_check_fds() - %i", status);
+		WLog_Print(rdp->log, WLOG_DEBUG, "transport_check_fds() - %i", status);
 
 	return status;
 }
@@ -1755,6 +1767,12 @@ rdpRdp* rdp_new(rdpContext* context)
 	rdp->context = context;
 	rdp->instance = context->instance;
 	flags = 0;
+
+	rdp->log = WLog_Get(FREERDP_TAG("core.rdp"));
+	if (!rdp->log)
+		goto fail;
+	if (!WLog_SetContext(rdp->log, context))
+		goto fail;
 
 	if (context->ServerMode)
 		flags |= FREERDP_SETTINGS_SERVER_MODE;

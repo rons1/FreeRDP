@@ -95,10 +95,10 @@ static BOOL tf_keyboard_set_ime_status(rdpContext* context, UINT16 imeId, UINT32
 	if (!context)
 		return FALSE;
 
-	WLog_WARN(TAG,
-	          "KeyboardSetImeStatus(unitId=%04" PRIx16 ", imeState=%08" PRIx32
-	          ", imeConvMode=%08" PRIx32 ") ignored",
-	          imeId, imeState, imeConvMode);
+	WLogEx_WARN(TAG, context,
+	            "KeyboardSetImeStatus(unitId=%04" PRIx16 ", imeState=%08" PRIx32
+	            ", imeConvMode=%08" PRIx32 ") ignored",
+	            imeId, imeState, imeConvMode);
 	return TRUE;
 }
 
@@ -179,6 +179,7 @@ static void tf_post_disconnect(freerdp* instance)
 static DWORD WINAPI tf_client_thread_proc(LPVOID arg)
 {
 	freerdp* instance = (freerdp*)arg;
+	rdpContext* context = instance->context;
 	DWORD nCount;
 	DWORD status;
 	DWORD result = 0;
@@ -189,14 +190,14 @@ static DWORD WINAPI tf_client_thread_proc(LPVOID arg)
 	{
 		result = freerdp_get_last_error(instance->context);
 		freerdp_abort_connect(instance);
-		WLog_ERR(TAG, "Authentication only, exit status 0x%08" PRIx32 "", result);
+		WLogEx_ERR(TAG, context, "Authentication only, exit status 0x%08" PRIx32 "", result);
 		goto disconnect;
 	}
 
 	if (!rc)
 	{
 		result = freerdp_get_last_error(instance->context);
-		WLog_ERR(TAG, "connection failure 0x%08" PRIx32, result);
+		WLogEx_ERR(TAG, context, "connection failure 0x%08" PRIx32, result);
 		return result;
 	}
 
@@ -206,7 +207,7 @@ static DWORD WINAPI tf_client_thread_proc(LPVOID arg)
 
 		if (nCount == 0)
 		{
-			WLog_ERR(TAG, "%s: freerdp_get_event_handles failed", __FUNCTION__);
+			WLogEx_ERR(TAG, context, "%s: freerdp_get_event_handles failed", __FUNCTION__);
 			break;
 		}
 
@@ -214,15 +215,15 @@ static DWORD WINAPI tf_client_thread_proc(LPVOID arg)
 
 		if (status == WAIT_FAILED)
 		{
-			WLog_ERR(TAG, "%s: WaitForMultipleObjects failed with %" PRIu32 "", __FUNCTION__,
-			         status);
+			WLogEx_ERR(TAG, context, "%s: WaitForMultipleObjects failed with %" PRIu32 "",
+			           __FUNCTION__, status);
 			break;
 		}
 
 		if (!freerdp_check_event_handles(instance->context))
 		{
 			if (freerdp_get_last_error(instance->context) == FREERDP_ERROR_SUCCESS)
-				WLog_ERR(TAG, "Failed to check FreeRDP event handles");
+				WLogEx_ERR(TAG, context, "Failed to check FreeRDP event handles");
 
 			break;
 		}
@@ -259,7 +260,7 @@ static int tf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 		return -1;
 
 	tf = (tfContext*)instance->context;
-	WLog_INFO(TAG, "Logon Error Info %s [%s]", str_data, str_type);
+	WLogEx_INFO(TAG, &tf->context, "Logon Error Info %s [%s]", str_data, str_type);
 	WINPR_UNUSED(tf);
 
 	return 1;

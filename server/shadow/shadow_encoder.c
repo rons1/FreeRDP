@@ -131,12 +131,15 @@ static int shadow_encoder_uninit_grid(rdpShadowEncoder* encoder)
 
 static int shadow_encoder_init_rfx(rdpShadowEncoder* encoder)
 {
+	freerdp* instance;
 	if (!encoder->rfx)
 		encoder->rfx = rfx_context_new(TRUE);
 
 	if (!encoder->rfx)
 		goto fail;
 
+	instance = encoder->server->settings->instance;
+	rfx_set_log_context(encoder->rfx, instance->context);
 	if (!rfx_context_reset(encoder->rfx, encoder->width, encoder->height))
 		goto fail;
 
@@ -158,6 +161,9 @@ static int shadow_encoder_init_nsc(rdpShadowEncoder* encoder)
 		encoder->nsc = nsc_context_new();
 
 	if (!encoder->nsc)
+		goto fail;
+
+	if (!nsc_set_log_context(encoder->nsc, context)) // TODO: Check context
 		goto fail;
 
 	if (!nsc_context_reset(encoder->nsc, encoder->width, encoder->height))

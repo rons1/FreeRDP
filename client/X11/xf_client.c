@@ -132,13 +132,13 @@ static void xf_draw_screen_scaled(xfContext* xfc, int x, int y, int w, int h)
 
 	if (xfc->scaledWidth <= 0 || xfc->scaledHeight <= 0)
 	{
-		WLog_ERR(TAG, "the current window dimensions are invalid");
+		WLogEx_ERR(TAG, &xfc->context, "the current window dimensions are invalid");
 		return;
 	}
 
 	if (settings->DesktopWidth <= 0 || settings->DesktopHeight <= 0)
 	{
-		WLog_ERR(TAG, "the window dimensions are invalid");
+		WLogEx_ERR(TAG, &xfc->context, "the window dimensions are invalid");
 		return;
 	}
 
@@ -228,13 +228,13 @@ void xf_draw_screen_(xfContext* xfc, int x, int y, int w, int h, const char* fkt
 {
 	if (!xfc)
 	{
-		WLog_DBG(TAG, "[%s] called from [%s] xfc=%p", __FUNCTION__, fkt, xfc);
+		WLogEx_DBG(TAG, &xfc->context, "[%s] called from [%s] xfc=%p", __FUNCTION__, fkt, xfc);
 		return;
 	}
 
 	if (w == 0 || h == 0)
 	{
-		WLog_WARN(TAG, "invalid width and/or height specified: w=%d h=%d", w, h);
+		WLogEx_WARN(TAG, &xfc->context, "invalid width and/or height specified: w=%d h=%d", w, h);
 		return;
 	}
 
@@ -815,17 +815,19 @@ void xf_lock_x11_(xfContext* xfc, const char* fkt)
 		XLockDisplay(xfc->display);
 
 	if (xfc->locked)
-		WLog_WARN(TAG, "%s:\t[%" PRIu32 "] recursive lock from %s", __FUNCTION__, xfc->locked, fkt);
+		WLogEx_WARN(TAG, &xfc->context, "%s:\t[%" PRIu32 "] recursive lock from %s", __FUNCTION__,
+		            xfc->locked, fkt);
 	xfc->locked++;
-	WLog_VRB(TAG, "%s:\t[%" PRIu32 "] from %s", __FUNCTION__, xfc->locked, fkt);
+	WLogEx_VRB(TAG, &xfc->context, "%s:\t[%" PRIu32 "] from %s", __FUNCTION__, xfc->locked, fkt);
 }
 
 void xf_unlock_x11_(xfContext* xfc, const char* fkt)
 {
 	if (xfc->locked == 0)
-		WLog_WARN(TAG, "X11: trying to unlock although not locked!");
+		WLogEx_WARN(TAG, &xfc->context, "X11: trying to unlock although not locked!");
 
-	WLog_VRB(TAG, "%s:\t[%" PRIu32 "] from %s", __FUNCTION__, xfc->locked - 1, fkt);
+	WLogEx_VRB(TAG, &xfc->context, "%s:\t[%" PRIu32 "] from %s", __FUNCTION__, xfc->locked - 1,
+	           fkt);
 	if (!xfc->UseXThreads)
 		ReleaseMutex(xfc->mutex);
 	else
@@ -849,7 +851,7 @@ static BOOL xf_get_pixmap_info(xfContext* xfc)
 
 	if (!pfs)
 	{
-		WLog_ERR(TAG, "XListPixmapFormats failed");
+		WLogEx_ERR(TAG, &xfc->context, "XListPixmapFormats failed");
 		return 1;
 	}
 
@@ -872,7 +874,7 @@ static BOOL xf_get_pixmap_info(xfContext* xfc)
 	if (XGetWindowAttributes(xfc->display, RootWindowOfScreen(xfc->screen), &window_attributes) ==
 	    0)
 	{
-		WLog_ERR(TAG, "XGetWindowAttributes failed");
+		WLogEx_ERR(TAG, &xfc->context, "XGetWindowAttributes failed");
 		return FALSE;
 	}
 
@@ -880,7 +882,7 @@ static BOOL xf_get_pixmap_info(xfContext* xfc)
 
 	if (!vis)
 	{
-		WLog_ERR(TAG, "XGetVisualInfo failed");
+		WLogEx_ERR(TAG, &xfc->context, "XGetVisualInfo failed");
 		return FALSE;
 	}
 
@@ -997,7 +999,7 @@ static void xf_get_x11_button_map(xfContext* xfc, unsigned char* x11_map)
 
 	if (XQueryExtension(xfc->display, "XInputExtension", &opcode, &event, &error))
 	{
-		WLog_DBG(TAG, "Searching for XInput pointer device");
+		WLogEx_DBG(TAG, &xfc->context, "Searching for XInput pointer device");
 		ptr_dev = NULL;
 		/* loop through every device, looking for a pointer */
 		version = XGetExtensionVersion(xfc->display, INAME);
@@ -1051,19 +1053,19 @@ static void xf_get_x11_button_map(xfContext* xfc, unsigned char* x11_map)
 		/* otherwise leave unchanged.                                            */
 		if (ptr_dev)
 		{
-			WLog_DBG(TAG, "Pointer device: %d", ptr_dev->device_id);
+			WLogEx_DBG(TAG, &xfc->context, "Pointer device: %d", ptr_dev->device_id);
 			XGetDeviceButtonMapping(xfc->display, ptr_dev, x11_map, NUM_BUTTONS_MAPPED);
 			XCloseDevice(xfc->display, ptr_dev);
 		}
 		else
 		{
-			WLog_DBG(TAG, "No pointer device found!");
+			WLogEx_DBG(TAG, &xfc->context, "No pointer device found!");
 		}
 	}
 	else
 #endif /* WITH_XI */
 	{
-		WLog_DBG(TAG, "Get global pointer mapping (no XInput)");
+		WLogEx_DBG(TAG, &xfc->context, "Get global pointer mapping (no XInput)");
 		XGetPointerMapping(xfc->display, x11_map, NUM_BUTTONS_MAPPED);
 	}
 }
@@ -1137,7 +1139,8 @@ static void xf_button_map_init(xfContext* xfc)
 		{
 			if (pos >= NUM_BUTTONS_MAPPED)
 			{
-				WLog_ERR(TAG, "Failed to map mouse button to RDP button, no space");
+				WLogEx_ERR(TAG, &xfc->context,
+				           "Failed to map mouse button to RDP button, no space");
 			}
 			else
 			{
@@ -1197,7 +1200,8 @@ static BOOL xf_pre_connect(freerdp* instance)
 			if (!settings->Username)
 				return FALSE;
 
-			WLog_INFO(TAG, "No user name set. - Using login name: %s", settings->Username);
+			WLogEx_INFO(TAG, &xfc->context, "No user name set. - Using login name: %s",
+			            settings->Username);
 		}
 	}
 
@@ -1206,11 +1210,11 @@ static BOOL xf_pre_connect(freerdp* instance)
 		/* Check +auth-only has a username and password. */
 		if (!settings->Password)
 		{
-			WLog_INFO(TAG, "auth-only, but no password set. Please provide one.");
+			WLogEx_INFO(TAG, &xfc->context, "auth-only, but no password set. Please provide one.");
 			return FALSE;
 		}
 
-		WLog_INFO(TAG, "Authentication only. Don't connect to X.");
+		WLogEx_INFO(TAG, &xfc->context, "Authentication only. Don't connect to X.");
 	}
 
 	if (!xf_keyboard_init(xfc))
@@ -1272,7 +1276,7 @@ static BOOL xf_post_connect(freerdp* instance)
 	{
 		if (!xf_register_graphics(context->graphics))
 		{
-			WLog_ERR(TAG, "failed to register graphics");
+			WLogEx_ERR(TAG, &xfc->context, "failed to register graphics");
 			return FALSE;
 		}
 
@@ -1295,13 +1299,14 @@ static BOOL xf_post_connect(freerdp* instance)
 	{
 		if (settings->SmartSizing)
 		{
-			WLog_ERR(TAG, "XRender not available: disabling smart-sizing");
+			WLogEx_ERR(TAG, &xfc->context, "XRender not available: disabling smart-sizing");
 			settings->SmartSizing = FALSE;
 		}
 
 		if (settings->MultiTouchGestures)
 		{
-			WLog_ERR(TAG, "XRender not available: disabling local multi-touch gestures");
+			WLogEx_ERR(TAG, &xfc->context,
+			           "XRender not available: disabling local multi-touch gestures");
 			settings->MultiTouchGestures = FALSE;
 		}
 	}
@@ -1311,7 +1316,7 @@ static BOOL xf_post_connect(freerdp* instance)
 
 	if (!xf_create_window(xfc))
 	{
-		WLog_ERR(TAG, "xf_create_window failed");
+		WLogEx_ERR(TAG, &xfc->context, "xf_create_window failed");
 		return FALSE;
 	}
 
@@ -1388,7 +1393,7 @@ static int xf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 	xfContext* xfc = (xfContext*)instance->context;
 	const char* str_data = freerdp_get_logon_error_info_data(data);
 	const char* str_type = freerdp_get_logon_error_info_type(type);
-	WLog_INFO(TAG, "Logon Error Info %s [%s]", str_data, str_type);
+	WLogEx_INFO(TAG, &xfc->context, "Logon Error Info %s [%s]", str_data, str_type);
 	xf_rail_disable_remoteapp_mode(xfc);
 	return 1;
 }
@@ -1487,7 +1492,7 @@ static BOOL handle_window_events(freerdp* instance)
 	{
 		if (!xf_process_x_events(instance))
 		{
-			WLog_INFO(TAG, "Closed from X11");
+			WLogEx_INFO(TAG, instance->context, "Closed from X11");
 			return FALSE;
 		}
 	}
@@ -1543,13 +1548,13 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 	/* --authonly ? */
 	if (instance->settings->AuthenticationOnly)
 	{
-		WLog_ERR(TAG, "Authentication only, exit status %" PRId32 "", !status);
+		WLogEx_ERR(TAG, &xfc->context, "Authentication only, exit status %" PRId32 "", !status);
 		goto disconnect;
 	}
 
 	if (!status)
 	{
-		WLog_ERR(TAG, "Freerdp connect error exit status %" PRId32 "", !status);
+		WLogEx_ERR(TAG, &xfc->context, "Freerdp connect error exit status %" PRId32 "", !status);
 		exit_code = freerdp_error_info(instance);
 
 		if (freerdp_get_last_error(instance->context) == FREERDP_ERROR_AUTHENTICATION_FAILED)
@@ -1565,7 +1570,7 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 
 	if (!timer)
 	{
-		WLog_ERR(TAG, "failed to create timer");
+		WLogEx_ERR(TAG, &xfc->context, "failed to create timer");
 		goto disconnect;
 	}
 
@@ -1584,7 +1589,7 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 	{
 		if (!(inputThread = CreateThread(NULL, 0, xf_input_thread, instance, 0, NULL)))
 		{
-			WLog_ERR(TAG, "async input: failed to create input thread");
+			WLogEx_ERR(TAG, &xfc->context, "async input: failed to create input thread");
 			exit_code = XF_EXIT_UNKNOWN;
 			goto disconnect;
 		}
@@ -1615,7 +1620,7 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 
 			if (tmp == 0)
 			{
-				WLog_ERR(TAG, "freerdp_get_event_handles failed");
+				WLogEx_ERR(TAG, &xfc->context, "freerdp_get_event_handles failed");
 				break;
 			}
 
@@ -1646,7 +1651,7 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 				}
 
 				if (freerdp_get_last_error(context) == FREERDP_ERROR_SUCCESS)
-					WLog_ERR(TAG, "Failed to check FreeRDP file descriptor");
+					WLogEx_ERR(TAG, &xfc->context, "Failed to check FreeRDP file descriptor");
 
 				break;
 			}
@@ -1676,8 +1681,9 @@ static DWORD WINAPI xf_client_thread(LPVOID param)
 		    freerdp_get_disconnect_ultimatum(context) == Disconnect_Ultimatum_user_requested)
 		{
 			/* This situation might be limited to Windows XP. */
-			WLog_INFO(TAG, "Error info says user did not initiate but disconnect ultimatum says "
-			               "they did; treat this as a user logoff");
+			WLogEx_INFO(TAG, &xfc->context,
+			            "Error info says user did not initiate but disconnect ultimatum says "
+			            "they did; treat this as a user logoff");
 			exit_code = XF_EXIT_LOGOFF;
 		}
 	}
@@ -1781,13 +1787,14 @@ static int xfreerdp_client_start(rdpContext* context)
 
 	if (!settings->ServerHostname)
 	{
-		WLog_ERR(TAG, "error: server hostname was not specified with /v:<server>[:port]");
+		WLogEx_ERR(TAG, &xfc->context,
+		           "error: server hostname was not specified with /v:<server>[:port]");
 		return -1;
 	}
 
 	if (!(xfc->thread = CreateThread(NULL, 0, xf_client_thread, context->instance, 0, NULL)))
 	{
-		WLog_ERR(TAG, "failed to create client thread");
+		WLogEx_ERR(TAG, &xfc->context, "failed to create client thread");
 		return -1;
 	}
 
@@ -1852,7 +1859,7 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 	{
 		if (!XInitThreads())
 		{
-			WLog_WARN(TAG, "XInitThreads() failure");
+			WLogEx_WARN(TAG, &xfc->context, "XInitThreads() failure");
 			xfc->UseXThreads = FALSE;
 		}
 	}
@@ -1861,8 +1868,9 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 
 	if (!xfc->display)
 	{
-		WLog_ERR(TAG, "failed to open display: %s", XDisplayName(NULL));
-		WLog_ERR(TAG, "Please check that the $DISPLAY environment variable is properly set.");
+		WLogEx_ERR(TAG, &xfc->context, "failed to open display: %s", XDisplayName(NULL));
+		WLogEx_ERR(TAG, &xfc->context,
+		           "Please check that the $DISPLAY environment variable is properly set.");
 		goto fail_open_display;
 	}
 
@@ -1870,7 +1878,7 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 
 	if (!xfc->mutex)
 	{
-		WLog_ERR(TAG, "Could not create mutex!");
+		WLogEx_ERR(TAG, &xfc->context, "Could not create mutex!");
 		goto fail_create_mutex;
 	}
 
@@ -1943,7 +1951,7 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 
 	if (!xfc->x11event)
 	{
-		WLog_ERR(TAG, "Could not create xfds event");
+		WLogEx_ERR(TAG, &xfc->context, "Could not create xfds event");
 		goto fail_xfds_event;
 	}
 
@@ -1951,7 +1959,7 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 
 	if (xfc->debug)
 	{
-		WLog_INFO(TAG, "Enabling X11 debug mode.");
+		WLogEx_INFO(TAG, &xfc->context, "Enabling X11 debug mode.");
 		XSynchronize(xfc->display, TRUE);
 		_def_error_handler = XSetErrorHandler(_xf_error_handler);
 	}
@@ -1960,7 +1968,7 @@ static BOOL xfreerdp_client_new(freerdp* instance, rdpContext* context)
 
 	if (!xf_get_pixmap_info(xfc))
 	{
-		WLog_ERR(TAG, "Failed to get pixmap info");
+		WLogEx_ERR(TAG, &xfc->context, "Failed to get pixmap info");
 		goto fail_pixmap_info;
 	}
 

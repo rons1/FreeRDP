@@ -55,51 +55,49 @@
 static char* test_pcap_file = NULL;
 static BOOL test_dump_rfx_realtime = TRUE;
 
+static void test_peer_context_free(freerdp_peer* client, rdpContext* ctx);
 static BOOL test_peer_context_new(freerdp_peer* client, rdpContext* ctx)
 {
 	testPeerContext* context = (testPeerContext*)ctx;
 	if (!(context->rfx_context = rfx_context_new(TRUE)))
-		goto fail_rfx_context;
+		goto fail;
+
+	if (!rfx_set_log_context(context->rfx_context, ctx))
+		goto fail;
 
 	if (!rfx_context_reset(context->rfx_context, SAMPLE_SERVER_DEFAULT_WIDTH,
 	                       SAMPLE_SERVER_DEFAULT_HEIGHT))
-		goto fail_rfx_context;
+		goto fail;
 
 	context->rfx_context->mode = RLGR3;
 	rfx_context_set_pixel_format(context->rfx_context, PIXEL_FORMAT_RGB24);
 
 	if (!(context->nsc_context = nsc_context_new()))
-		goto fail_nsc_context;
+		goto fail;
+
+	if (!nsc_set_log_context(context->nsc_context, ctx))
+		goto fail;
 
 	if (!nsc_context_set_parameters(context->nsc_context, NSC_COLOR_FORMAT, PIXEL_FORMAT_RGB24))
-		goto fail_stream_new;
+		goto fail;
 
 	if (!(context->s = Stream_New(NULL, 65536)))
-		goto fail_stream_new;
+		goto fail;
 
 	context->icon_x = -1;
 	context->icon_y = -1;
 	context->vcm = WTSOpenServerA((LPSTR)client->context);
 
 	if (!context->vcm || context->vcm == INVALID_HANDLE_VALUE)
-		goto fail_open_server;
+		goto fail;
 
 	return TRUE;
-fail_open_server:
-	context->vcm = NULL;
-	Stream_Free(context->s, TRUE);
-	context->s = NULL;
-fail_stream_new:
-	nsc_context_free(context->nsc_context);
-	context->nsc_context = NULL;
-fail_nsc_context:
-	rfx_context_free(context->rfx_context);
-	context->rfx_context = NULL;
-fail_rfx_context:
+fail:
+	test_peer_context_free(client, &context->_p);
 	return FALSE;
 }
 
-static void test_peer_context_free(freerdp_peer* client, rdpContext* ctx)
+void test_peer_context_free(freerdp_peer* client, rdpContext* ctx)
 {
 	testPeerContext* context = (testPeerContext*)ctx;
 	WINPR_UNUSED(client);

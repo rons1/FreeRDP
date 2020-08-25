@@ -645,7 +645,8 @@ static BOOL license_get_server_rsa_public_key(rdpLicense* license)
 
 	if (license->ServerCertificate->length < 1)
 	{
-		if (!certificate_read_server_certificate(license->certificate, settings->ServerCertificate,
+		if (!certificate_read_server_certificate(license->certificate, license->rdp->context,
+		                                         settings->ServerCertificate,
 		                                         settings->ServerCertificateLength))
 			return FALSE;
 	}
@@ -1113,7 +1114,8 @@ BOOL license_read_license_request_packet(rdpLicense* license, wStream* s)
 		return FALSE;
 
 	/* Parse Server Certificate */
-	if (!certificate_read_server_certificate(license->certificate, license->ServerCertificate->data,
+	if (!certificate_read_server_certificate(license->certificate, license->rdp->context,
+	                                         license->ServerCertificate->data,
 	                                         license->ServerCertificate->length))
 		return FALSE;
 

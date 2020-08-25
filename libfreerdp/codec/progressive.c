@@ -2371,3 +2371,11 @@ void progressive_context_free(PROGRESSIVE_CONTEXT* progressive)
 
 	free(progressive);
 }
+
+BOOL progressive_set_log_context(PROGRESSIVE_CONTEXT* progressive, void* context)
+{
+	if (!progressive)
+		return FALSE;
+
+	return WLog_SetContext(progressive->log, context);
+}

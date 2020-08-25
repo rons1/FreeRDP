@@ -489,3 +489,10 @@ BOOL nsc_process_message(NSC_CONTEXT* context, UINT16 bpp, UINT32 width, UINT32 
 
 	return TRUE;
 }
+
+BOOL nsc_set_log_context(NSC_CONTEXT* nsc, void* context)
+{
+	if (!nsc || !nsc->priv)
+		return FALSE;
+	return WLog_SetContext(nsc->priv->log, context);
+}

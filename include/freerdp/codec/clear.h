@@ -42,6 +42,7 @@ extern "C"
 	                                   UINT32 nYDst, UINT32 nDstWidth, UINT32 nDstHeight,
 	                                   const gdiPalette* palette);
 
+	FREERDP_API BOOL clear_set_log_context(CLEAR_CONTEXT* clear, void* context);
 	FREERDP_API BOOL clear_context_reset(CLEAR_CONTEXT* clear);
 
 	FREERDP_API CLEAR_CONTEXT* clear_context_new(BOOL Compressor);
