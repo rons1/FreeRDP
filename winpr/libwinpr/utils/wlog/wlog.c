@@ -94,6 +94,20 @@ static void WLog_Uninit_(void)
 	g_RootLog = NULL;
 }
 
+static const char* wlog_pointer_context_formatter(wLog* log)
+{
+	if (!log || !log->Context)
+		return "NULL context, use WLog_SetContext to set a proper context";
+	if (!log->ContextString)
+	{
+		log->ContextString = calloc(1, 64);
+		if (!log->ContextString)
+			return "NULL, malloc failed for logger";
+		_snprintf(log->ContextString, 63, "context=0x%08X", log->Context);
+	}
+	return log->ContextString;
+}
+
 static BOOL CALLBACK WLog_InitializeRoot(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context)
 {
 	char* env;
@@ -102,6 +116,9 @@ static BOOL CALLBACK WLog_InitializeRoot(PINIT_ONCE InitOnce, PVOID Parameter, P
 	LPCSTR appender = "WLOG_APPENDER";
 
 	if (!(g_RootLog = WLog_New("", NULL)))
+		return FALSE;
+
+	if (!WLog_SetContextFormatter(g_RootLog, wlog_pointer_context_formatter))
 		return FALSE;
 
 	g_RootLog->IsRoot = TRUE;
@@ -1009,4 +1026,29 @@ BOOL WLog_Init(void)
 BOOL WLog_Uninit(void)
 {
 	return TRUE;
+}
+
+BOOL WLog_SetContext(wLog* log, const void* context)
+{
+	if (!log)
+		return FALSE;
+	log->Context = context;
+	return TRUE;
+}
+
+BOOL WLog_SetContextFormatter(wLog* log, wlog_context_formatter fkt)
+{
+	if (!log)
+		return FALSE;
+	log->formatter = fkt;
+	return TRUE;
+}
+
+wlog_context_formatter WLog_GetContextFormatter(wLog* log)
+{
+	if (!log)
+		return NULL;
+	if (!log->formatter)
+		return WLog_GetContextFormatter(log->Parent);
+	return log->formatter;
 }

@@ -46,37 +46,62 @@
 #include <winpr/debug.h>
 
 #define TAG "com.winpr.utils.debug"
-#define LOGT(...)                                           \
-	do                                                      \
-	{                                                       \
-		WLog_Print(WLog_Get(TAG), WLOG_TRACE, __VA_ARGS__); \
+#define LOGT(context, ...)                        \
+	do                                            \
+	{                                             \
+		static wLog* log = NULL;                  \
+		if (!log)                                 \
+			log = WLog_Get(TAG);                  \
+		WLog_SetContext(log, context);            \
+		WLog_Print(log, WLOG_TRACE, __VA_ARGS__); \
 	} while (0)
-#define LOGD(...)                                           \
-	do                                                      \
-	{                                                       \
-		WLog_Print(WLog_Get(TAG), WLOG_DEBUG, __VA_ARGS__); \
+#define LOGD(context, ...)                        \
+	do                                            \
+	{                                             \
+		static wLog* log = NULL;                  \
+		if (!log)                                 \
+			log = WLog_Get(TAG);                  \
+		WLog_SetContext(log, context);            \
+		WLog_Print(log, WLOG_DEBUG, __VA_ARGS__); \
 	} while (0)
-#define LOGI(...)                                          \
-	do                                                     \
-	{                                                      \
-		WLog_Print(WLog_Get(TAG), WLOG_INFO, __VA_ARGS__); \
+#define LOGI(context, ...)                       \
+	do                                           \
+	{                                            \
+		static wLog* log = NULL;                 \
+		if (!log)                                \
+			log = WLog_Get(TAG);                 \
+		WLog_SetContext(log, context);           \
+		WLog_Print(log, WLOG_INFO, __VA_ARGS__); \
 	} while (0)
-#define LOGW(...)                                          \
-	do                                                     \
-	{                                                      \
-		WLog_Print(WLog_Get(TAG), WLOG_WARN, __VA_ARGS__); \
+#define LOGW(context, ...)                       \
+	do                                           \
+	{                                            \
+		static wLog* log = NULL;                 \
+		if (!log)                                \
+			log = WLog_Get(TAG);                 \
+		WLog_SetContext(log, context);           \
+		WLog_Print(log, WLOG_WARN, __VA_ARGS__); \
 	} while (0)
-#define LOGE(...)                                           \
-	do                                                      \
-	{                                                       \
-		WLog_Print(WLog_Get(TAG), WLOG_ERROR, __VA_ARGS__); \
+#define LOGE(context, ...)                        \
+	do                                            \
+	{                                             \
+		static wLog* log = NULL;                  \
+		if (!log)                                 \
+			log = WLog_Get(TAG);                  \
+		WLog_SetContext(log, context);            \
+		WLog_Print(log, WLOG_ERROR, __VA_ARGS__); \
 	} while (0)
-#define LOGF(...)                                           \
-	do                                                      \
-	{                                                       \
-		WLog_Print(WLog_Get(TAG), WLOG_FATAL, __VA_ARGS__); \
+#define LOGF(context, ...)                        \
+	do                                            \
+	{                                             \
+		static wLog* log = NULL;                  \
+		if (!log)                                 \
+			log = WLog_Get(TAG);                  \
+		WLog_SetContext(log, context);            \
+		WLog_Print(log, WLOG_FATAL, __VA_ARGS__); \
 	} while (0)
 
+static const void* context = NULL; // TODO: Set logging context
 static const char* support_msg = "Invalid stacktrace buffer! check if platform is supported!";
 
 #if defined(HAVE_EXECINFO_H)
@@ -141,7 +166,7 @@ void load_library(void)
 
 		if (!lib.hdl)
 		{
-			LOGF("dlopen error %s", dlerror());
+			LOGF(context, "dlopen error %s", dlerror());
 			goto fail;
 		}
 
@@ -149,7 +174,7 @@ void load_library(void)
 
 		if (!lib.unwind_backtrace)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -157,7 +182,7 @@ void load_library(void)
 
 		if (!lib.unwind_backtrace_thread)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -165,7 +190,7 @@ void load_library(void)
 
 		if (!lib.unwind_backtrace_ptrace)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -173,7 +198,7 @@ void load_library(void)
 
 		if (!lib.get_backtrace_symbols)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -181,7 +206,7 @@ void load_library(void)
 
 		if (!lib.get_backtrace_symbols_ptrace)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -189,7 +214,7 @@ void load_library(void)
 
 		if (!lib.free_backtrace_symbols)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -197,7 +222,7 @@ void load_library(void)
 
 		if (!lib.format_backtrace_line)
 		{
-			LOGF("dlsym error %s", dlerror());
+			LOGF(context, "dlsym error %s", dlerror());
 			goto fail;
 		}
 
@@ -260,7 +285,7 @@ void winpr_backtrace_free(void* buffer)
 {
 	if (!buffer)
 	{
-		LOGF(support_msg);
+		LOGF(context, support_msg);
 		return;
 	}
 
@@ -279,7 +304,7 @@ void winpr_backtrace_free(void* buffer)
 		free(data);
 	}
 #else
-	LOGF(support_msg);
+	LOGF(context, support_msg);
 #endif
 }
 
@@ -340,7 +365,7 @@ void* winpr_backtrace(DWORD size)
 	data->used = RtlCaptureStackBackTrace(2, size, data->stack, NULL);
 	return data;
 #else
-	LOGF(support_msg);
+	LOGF(context, support_msg);
 	return NULL;
 #endif
 }
@@ -352,7 +377,7 @@ char** winpr_backtrace_symbols(void* buffer, size_t* used)
 
 	if (!buffer)
 	{
-		LOGF(support_msg);
+		LOGF(context, support_msg);
 		return NULL;
 	}
 
@@ -376,7 +401,7 @@ char** winpr_backtrace_symbols(void* buffer, size_t* used)
 
 	if (!fkt)
 	{
-		LOGF(support_msg);
+		LOGF(context, support_msg);
 		return NULL;
 	}
 	else
@@ -464,7 +489,7 @@ char** winpr_backtrace_symbols(void* buffer, size_t* used)
 		return vlines;
 	}
 #else
-	LOGF(support_msg);
+	LOGF(context, support_msg);
 	return NULL;
 #endif
 }
@@ -473,7 +498,7 @@ void winpr_backtrace_symbols_fd(void* buffer, int fd)
 {
 	if (!buffer)
 	{
-		LOGF(support_msg);
+		LOGF(context, support_msg);
 		return;
 	}
 
@@ -498,13 +523,14 @@ void winpr_backtrace_symbols_fd(void* buffer, int fd)
 		}
 	}
 #else
-	LOGF(support_msg);
+	LOGF(context, support_msg);
 #endif
 }
 
 void winpr_log_backtrace(const char* tag, DWORD level, DWORD size)
 {
-	winpr_log_backtrace_ex(WLog_Get(tag), level, size);
+	wLog* log = WLog_Get(tag);
+	winpr_log_backtrace_ex(log, level, size);
 }
 
 void winpr_log_backtrace_ex(wLog* log, DWORD level, DWORD size)

@@ -344,8 +344,8 @@ static BOOL rdp_recv_server_redirection_pdu(rdpRdp* rdp, wStream* s)
 
 		Stream_Read(s, redirection->LoadBalanceInfo, redirection->LoadBalanceInfoLength);
 		WLog_DBG(TAG, "loadBalanceInfo:");
-		winpr_HexDump(TAG, WLOG_DEBUG, redirection->LoadBalanceInfo,
-		              redirection->LoadBalanceInfoLength);
+		winpr_HexDumpEx(TAG, rdp->context, WLOG_DEBUG, redirection->LoadBalanceInfo,
+		                redirection->LoadBalanceInfoLength);
 	}
 
 	if (redirection->flags & LB_USERNAME)
@@ -448,7 +448,8 @@ static BOOL rdp_recv_server_redirection_pdu(rdpRdp* rdp, wStream* s)
 
 		Stream_Read(s, redirection->TsvUrl, redirection->TsvUrlLength);
 		WLog_DBG(TAG, "TsvUrl:");
-		winpr_HexDump(TAG, WLOG_DEBUG, redirection->TsvUrl, redirection->TsvUrlLength);
+		winpr_HexDumpEx(TAG, rdp->context, WLOG_DEBUG, redirection->TsvUrl,
+		                redirection->TsvUrlLength);
 	}
 
 	if (redirection->flags & LB_TARGET_NET_ADDRESSES)

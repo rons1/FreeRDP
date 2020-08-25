@@ -46,7 +46,8 @@
 #define BB_RSA_SIGNATURE_BLOB 8
 
 FREERDP_LOCAL BOOL certificate_read_server_certificate(rdpCertificate* certificate,
-                                                       BYTE* server_cert, size_t length);
+                                                       rdpContext* context, BYTE* server_cert,
+                                                       size_t length);
 
 FREERDP_LOCAL rdpCertificate* certificate_clone(rdpCertificate* certificate);
 
@@ -60,11 +61,11 @@ FREERDP_LOCAL rdpRsaKey* key_clone(const rdpRsaKey* key);
 
 #define CERTIFICATE_TAG FREERDP_TAG("core.certificate")
 #ifdef WITH_DEBUG_CERTIFICATE
-#define DEBUG_CERTIFICATE(...) WLog_DBG(CERTIFICATE_TAG, __VA_ARGS__)
+#define DEBUG_CERTIFICATE(context, ...) WLogEx_DBG(CERTIFICATE_TAG, context, __VA_ARGS__)
 #else
-#define DEBUG_CERTIFICATE(...) \
-	do                         \
-	{                          \
+#define DEBUG_CERTIFICATE(context, ...) \
+	do                                  \
+	{                                   \
 	} while (0)
 #endif
 

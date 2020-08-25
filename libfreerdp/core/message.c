@@ -1159,7 +1159,7 @@ static BOOL update_message_WindowIcon(rdpContext* context, const WINDOW_ORDER_IN
 		goto out_fail;
 
 	CopyMemory(lParam, windowIcon, sizeof(WINDOW_ICON_ORDER));
-	WLog_VRB(TAG, "update_message_WindowIcon");
+	WLogEx_VRB(TAG, context, "update_message_WindowIcon");
 
 	if (windowIcon->iconInfo->cbBitsColor > 0)
 	{
@@ -2423,7 +2423,8 @@ static int update_message_process_class(rdpUpdateProxy* proxy, wMessage* msg, in
 
 	if (!status)
 	{
-		WLog_ERR(TAG, "message: class: %d type: %d failed", msgClass, msgType);
+		WLogEx_ERR(TAG, proxy->update->context, "message: class: %d type: %d failed", msgClass,
+		           msgType);
 		return -1;
 	}
 
@@ -2674,8 +2675,8 @@ static DWORD WINAPI update_message_proxy_thread(LPVOID arg)
 
 	if (!update || !update->queue)
 	{
-		WLog_ERR(TAG, "update=%p, update->queue=%p", (void*)update,
-		         (void*)(update ? update->queue : NULL));
+		WLogEx_ERR(TAG, update->context, "update=%p, update->queue=%p", (void*)update,
+		           (void*)(update ? update->queue : NULL));
 		ExitThread(1);
 		return 1;
 	}
@@ -2710,7 +2711,7 @@ rdpUpdateProxy* update_message_proxy_new(rdpUpdate* update)
 
 	if (!(message->thread = CreateThread(NULL, 0, update_message_proxy_thread, update, 0, NULL)))
 	{
-		WLog_ERR(TAG, "Failed to create proxy thread");
+		WLog_ERR(TAG, update->context, "Failed to create proxy thread");
 		free(message);
 		return NULL;
 	}
@@ -2936,7 +2937,8 @@ static int input_message_process_class(rdpInputProxy* proxy, wMessage* msg, int 
 	}
 
 	if (status < 0)
-		WLog_ERR(TAG, "Unknown event: class: %d type: %d", msgClass, msgType);
+		WLog_ERR(TAG, proxy->input->context, "Unknown event: class: %d type: %d", msgClass,
+		         msgType);
 
 	return status;
 }

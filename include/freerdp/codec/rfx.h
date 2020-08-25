@@ -196,6 +196,8 @@ extern "C"
 
 	FREERDP_API BOOL rfx_context_reset(RFX_CONTEXT* context, UINT32 width, UINT32 height);
 
+	FREERDP_API BOOL rfx_set_log_context(RFX_CONTEXT* context, const void* userdata);
+
 	FREERDP_API RFX_CONTEXT* rfx_context_new(BOOL encoder);
 	FREERDP_API void rfx_context_free(RFX_CONTEXT* context);
 

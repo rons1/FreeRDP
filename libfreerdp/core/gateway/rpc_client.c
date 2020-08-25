@@ -191,7 +191,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 				if (!rts_match_pdu_signature(&RTS_PDU_CONN_A3_SIGNATURE, rts))
 				{
-					WLog_ERR(TAG, "unexpected RTS PDU: Expected CONN/A3");
+					WLogEx_ERR(TAG, rpc->context, "unexpected RTS PDU: Expected CONN/A3");
 					return -1;
 				}
 
@@ -199,7 +199,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 				if (status < 0)
 				{
-					WLog_ERR(TAG, "rts_recv_CONN_A3_pdu failure");
+					WLogEx_ERR(TAG, rpc->context, "rts_recv_CONN_A3_pdu failure");
 					return -1;
 				}
 
@@ -213,7 +213,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 				if (!rts_match_pdu_signature(&RTS_PDU_CONN_C2_SIGNATURE, rts))
 				{
-					WLog_ERR(TAG, "unexpected RTS PDU: Expected CONN/C2");
+					WLogEx_ERR(TAG, rpc->context, "unexpected RTS PDU: Expected CONN/C2");
 					return -1;
 				}
 
@@ -221,7 +221,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 				if (status < 0)
 				{
-					WLog_ERR(TAG, "rts_recv_CONN_C2_pdu failure");
+					WLogEx_ERR(TAG, rpc->context, "rts_recv_CONN_C2_pdu failure");
 					return -1;
 				}
 
@@ -231,7 +231,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 				if (rpc_send_bind_pdu(rpc) < 0)
 				{
-					WLog_ERR(TAG, "rpc_send_bind_pdu failure");
+					WLogEx_ERR(TAG, rpc->context, "rpc_send_bind_pdu failure");
 					return -1;
 				}
 
@@ -254,22 +254,22 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 			{
 				if (rpc_recv_bind_ack_pdu(rpc, Stream_Buffer(pdu->s), Stream_Length(pdu->s)) <= 0)
 				{
-					WLog_ERR(TAG, "rpc_recv_bind_ack_pdu failure");
+					WLogEx_ERR(TAG, rpc->context, "rpc_recv_bind_ack_pdu failure");
 					return -1;
 				}
 			}
 			else
 			{
-				WLog_ERR(TAG,
-				         "RPC_CLIENT_STATE_WAIT_SECURE_BIND_ACK unexpected pdu type: 0x%08" PRIX32
-				         "",
-				         pdu->Type);
+				WLogEx_ERR(TAG, rpc->context,
+				           "RPC_CLIENT_STATE_WAIT_SECURE_BIND_ACK unexpected pdu type: 0x%08" PRIX32
+				           "",
+				           pdu->Type);
 				return -1;
 			}
 
 			if (rpc_send_rpc_auth_3_pdu(rpc) < 0)
 			{
-				WLog_ERR(TAG, "rpc_secure_bind: error sending rpc_auth_3 pdu!");
+				WLogEx_ERR(TAG, rpc->context, "rpc_secure_bind: error sending rpc_auth_3 pdu!");
 				return -1;
 			}
 
@@ -277,7 +277,7 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 
 			if (!tsg_proxy_begin(tsg))
 			{
-				WLog_ERR(TAG, "tsg_proxy_begin failure");
+				WLogEx_ERR(TAG, rpc->context, "tsg_proxy_begin failure");
 				return -1;
 			}
 
@@ -285,7 +285,8 @@ static int rpc_client_recv_pdu(rdpRpc* rpc, RPC_PDU* pdu)
 		}
 		else
 		{
-			WLog_ERR(TAG, "rpc_client_recv_pdu: invalid rpc->State: %d", rpc->State);
+			WLogEx_ERR(TAG, rpc->context, "rpc_client_recv_pdu: invalid rpc->State: %d",
+			           rpc->State);
 		}
 	}
 	else if (rpc->State >= RPC_CLIENT_STATE_CONTEXT_NEGOTIATED)
@@ -326,7 +327,7 @@ static int rpc_client_recv_fragment(rdpRpc* rpc, wStream* fragment)
 
 		if (!rpc_get_stub_data_info(rpc, buffer, &StubOffset, &StubLength))
 		{
-			WLog_ERR(TAG, "expected stub");
+			WLogEx_ERR(TAG, rpc->context, "expected stub");
 			return -1;
 		}
 
@@ -358,10 +359,10 @@ static int rpc_client_recv_fragment(rdpRpc* rpc, wStream* fragment)
 
 		if (rpc->StubCallId != header->common.call_id)
 		{
-			WLog_ERR(TAG,
-			         "invalid call_id: actual: %" PRIu32 ", expected: %" PRIu32
-			         ", frag_count: %" PRIu32 "",
-			         rpc->StubCallId, header->common.call_id, rpc->StubFragCount);
+			WLogEx_ERR(TAG, rpc->context,
+			           "invalid call_id: actual: %" PRIu32 ", expected: %" PRIu32
+			           ", frag_count: %" PRIu32 "",
+			           rpc->StubCallId, header->common.call_id, rpc->StubFragCount);
 		}
 
 		call = rpc_client_call_find_by_id(rpc->client, rpc->StubCallId);
@@ -455,7 +456,8 @@ static int rpc_client_recv_fragment(rdpRpc* rpc, wStream* fragment)
 	}
 	else
 	{
-		WLog_ERR(TAG, "unexpected RPC PDU type 0x%02" PRIX8 "", header->common.ptype);
+		WLogEx_ERR(TAG, rpc->context, "unexpected RPC PDU type 0x%02" PRIX8 "",
+		           header->common.ptype);
 		return -1;
 	}
 
@@ -491,7 +493,7 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 			if (!rpc_ncacn_http_recv_out_channel_response(&outChannel->common, response))
 			{
 				http_response_free(response);
-				WLog_ERR(TAG, "rpc_ncacn_http_recv_out_channel_response failure");
+				WLogEx_ERR(TAG, rpc->context, "rpc_ncacn_http_recv_out_channel_response failure");
 				return -1;
 			}
 
@@ -500,7 +502,7 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 			if (!rpc_ncacn_http_send_out_channel_request(&outChannel->common, FALSE))
 			{
 				http_response_free(response);
-				WLog_ERR(TAG, "rpc_ncacn_http_send_out_channel_request failure");
+				WLogEx_ERR(TAG, rpc->context, "rpc_ncacn_http_send_out_channel_request failure");
 				return -1;
 			}
 
@@ -512,7 +514,7 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 			if (rts_send_CONN_A1_pdu(rpc) < 0)
 			{
 				http_response_free(response);
-				WLog_ERR(TAG, "rpc_send_CONN_A1_pdu error!");
+				WLogEx_ERR(TAG, rpc->context, "rpc_send_CONN_A1_pdu error!");
 				return -1;
 			}
 
@@ -544,7 +546,7 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 
 		if (statusCode != HTTP_STATUS_OK)
 		{
-			WLog_ERR(TAG, "error! Status Code: %" PRIu32 "", statusCode);
+			WLogEx_ERR(TAG, rpc->context, "error! Status Code: %" PRIu32 "", statusCode);
 			http_response_print(response);
 
 			if (statusCode == HTTP_STATUS_DENIED)
@@ -585,11 +587,11 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 
 			if (header->frag_length > rpc->max_recv_frag)
 			{
-				WLog_ERR(TAG,
-				         "rpc_client_recv: invalid fragment size: %" PRIu16 " (max: %" PRIu16 ")",
-				         header->frag_length, rpc->max_recv_frag);
-				winpr_HexDump(TAG, WLOG_ERROR, Stream_Buffer(fragment),
-				              Stream_GetPosition(fragment));
+				WLogEx_ERR(TAG, rpc->context,
+				           "rpc_client_recv: invalid fragment size: %" PRIu16 " (max: %" PRIu16 ")",
+				           header->frag_length, rpc->max_recv_frag);
+				winpr_HexDumpEx(TAG, rpc->context, WLOG_ERROR, Stream_Buffer(fragment),
+				                Stream_GetPosition(fragment));
 				return -1;
 			}
 
@@ -600,7 +602,7 @@ static int rpc_client_default_out_channel_recv(rdpRpc* rpc)
 
 				if (status < 0)
 				{
-					WLog_ERR(TAG, "error reading fragment body");
+					WLogEx_ERR(TAG, rpc->context, "error reading fragment body");
 					return -1;
 				}
 
@@ -672,25 +674,27 @@ static int rpc_client_nondefault_out_channel_recv(rdpRpc* rpc)
 						}
 						else
 						{
-							WLog_ERR(TAG, "rts_send_OUT_R1/A3_pdu failure");
+							WLogEx_ERR(TAG, rpc->context, "rts_send_OUT_R1/A3_pdu failure");
 						}
 					}
 					else
 					{
-						WLog_ERR(TAG, "rpc_ncacn_http_send_out_channel_request failure");
+						WLogEx_ERR(TAG, rpc->context,
+						           "rpc_ncacn_http_send_out_channel_request failure");
 					}
 				}
 				else
 				{
-					WLog_ERR(TAG, "rpc_ncacn_http_recv_out_channel_response failure");
+					WLogEx_ERR(TAG, rpc->context,
+					           "rpc_ncacn_http_recv_out_channel_response failure");
 				}
 
 				break;
 
 			default:
-				WLog_ERR(TAG,
-				         "rpc_client_nondefault_out_channel_recv: Unexpected message %08" PRIx32,
-				         nextOutChannel->State);
+				WLogEx_ERR(TAG, rpc->context,
+				           "rpc_client_nondefault_out_channel_recv: Unexpected message %08" PRIx32,
+				           nextOutChannel->State);
 				return -1;
 		}
 
@@ -750,7 +754,7 @@ int rpc_client_in_channel_recv(rdpRpc* rpc)
 		{
 			if (!rpc_ncacn_http_recv_in_channel_response(&inChannel->common, response))
 			{
-				WLog_ERR(TAG, "rpc_ncacn_http_recv_in_channel_response failure");
+				WLogEx_ERR(TAG, rpc->context, "rpc_ncacn_http_recv_in_channel_response failure");
 				http_response_free(response);
 				return -1;
 			}
@@ -759,7 +763,7 @@ int rpc_client_in_channel_recv(rdpRpc* rpc)
 
 			if (!rpc_ncacn_http_send_in_channel_request(&inChannel->common))
 			{
-				WLog_ERR(TAG, "rpc_ncacn_http_send_in_channel_request failure");
+				WLogEx_ERR(TAG, rpc->context, "rpc_ncacn_http_send_in_channel_request failure");
 				http_response_free(response);
 				return -1;
 			}
@@ -771,7 +775,7 @@ int rpc_client_in_channel_recv(rdpRpc* rpc)
 
 			if (rts_send_CONN_B1_pdu(rpc) < 0)
 			{
-				WLog_ERR(TAG, "rpc_send_CONN_B1_pdu error!");
+				WLogEx_ERR(TAG, rpc->context, "rpc_send_CONN_B1_pdu error!");
 				http_response_free(response);
 				return -1;
 			}
@@ -913,7 +917,7 @@ BOOL rpc_client_write_call(rdpRpc* rpc, wStream* s, UINT16 opnum)
 
 	if (!ntlm)
 	{
-		WLog_ERR(TAG, "invalid ntlm context");
+		WLogEx_ERR(TAG, rpc->context, "invalid ntlm context");
 		goto fail;
 	}
 

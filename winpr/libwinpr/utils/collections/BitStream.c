@@ -95,7 +95,7 @@ const char* BYTE_BIT_STRINGS_MSB[256] = {
 	"00011111", "10011111", "01011111", "11011111", "00111111", "10111111", "01111111", "11111111"
 };
 
-void BitDump(const char* tag, UINT32 level, const BYTE* buffer, UINT32 length, UINT32 flags)
+static void BitDumpInt(wLog* log, UINT32 level, const BYTE* buffer, UINT32 length, UINT32 flags)
 {
 	DWORD i;
 	int nbits;
@@ -114,12 +114,25 @@ void BitDump(const char* tag, UINT32 level, const BYTE* buffer, UINT32 length, U
 		if ((i % 64) == 0)
 		{
 			pos = 0;
-			WLog_LVL(tag, level, "%s", pbuffer);
+			WLog_Print(log, level, "%s", pbuffer);
 		}
 	}
 
 	if (i)
-		WLog_LVL(tag, level, "%s ", pbuffer);
+		WLog_Print(log, level, "%s ", pbuffer);
+}
+
+void BitDump(const char* tag, UINT32 level, const BYTE* buffer, UINT32 length, UINT32 flags)
+{
+	BitDumpInt(WLog_Get(tag), level, buffer, length, flags);
+}
+
+void BitDumpEx(const char* tag, const void* context, UINT32 level, const BYTE* buffer,
+               UINT32 length, UINT32 flags)
+{
+	wLog* log = WLog_Get(tag);
+	WLog_SetContext(log, context);
+	BitDumpInt(log, level, buffer, length, flags);
 }
 
 UINT32 ReverseBits32(UINT32 bits, UINT32 nbits)

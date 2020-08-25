@@ -31,8 +31,6 @@
 #include <freerdp/codec/clear.h>
 #include <freerdp/log.h>
 
-#define TAG FREERDP_TAG("codec.clear")
-
 #define CLEARCODEC_FLAG_GLYPH_INDEX 0x01
 #define CLEARCODEC_FLAG_GLYPH_HIT 0x02
 #define CLEARCODEC_FLAG_CACHE_RESET 0x04
@@ -71,6 +69,7 @@ struct _CLEAR_CONTEXT
 	CLEAR_VBAR_ENTRY VBarStorage[CLEARCODEC_VBAR_SIZE];
 	UINT32 ShortVBarStorageCursor;
 	CLEAR_VBAR_ENTRY ShortVBarStorage[CLEARCODEC_VBAR_SHORT_SIZE];
+	wLog* log;
 };
 
 static const UINT32 CLEAR_LOG2_FLOOR[256] = {
@@ -101,16 +100,17 @@ static BOOL convert_color(BYTE* dst, UINT32 nDstStep, UINT32 DstFormat, UINT32 n
 	                          SrcFormat, nSrcStep, 0, 0, palette, 0);
 }
 
-static BOOL clear_decompress_nscodec(NSC_CONTEXT* nsc, UINT32 width, UINT32 height, wStream* s,
-                                     UINT32 bitmapDataByteCount, BYTE* pDstData, UINT32 DstFormat,
-                                     UINT32 nDstStep, UINT32 nXDstRel, UINT32 nYDstRel)
+static BOOL clear_decompress_nscodec(CLEAR_CONTEXT* clear, NSC_CONTEXT* nsc, UINT32 width,
+                                     UINT32 height, wStream* s, UINT32 bitmapDataByteCount,
+                                     BYTE* pDstData, UINT32 DstFormat, UINT32 nDstStep,
+                                     UINT32 nXDstRel, UINT32 nYDstRel)
 {
 	BOOL rc;
 
 	if (Stream_GetRemainingLength(s) < bitmapDataByteCount)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-		         Stream_GetRemainingLength(s), bitmapDataByteCount);
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [%" PRIu32 " expected]",
+		           Stream_GetRemainingLength(s), bitmapDataByteCount);
 		return FALSE;
 	}
 
@@ -121,10 +121,11 @@ static BOOL clear_decompress_nscodec(NSC_CONTEXT* nsc, UINT32 width, UINT32 heig
 	return rc;
 }
 
-static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount, UINT32 width,
-                                          UINT32 height, BYTE* pDstData, UINT32 DstFormat,
-                                          UINT32 nDstStep, UINT32 nXDstRel, UINT32 nYDstRel,
-                                          UINT32 nDstWidth, UINT32 nDstHeight)
+static BOOL clear_decompress_subcode_rlex(CLEAR_CONTEXT* clear, wStream* s,
+                                          UINT32 bitmapDataByteCount, UINT32 width, UINT32 height,
+                                          BYTE* pDstData, UINT32 DstFormat, UINT32 nDstStep,
+                                          UINT32 nXDstRel, UINT32 nYDstRel, UINT32 nDstWidth,
+                                          UINT32 nDstHeight)
 {
 	UINT32 x = 0, y = 0;
 	UINT32 i;
@@ -141,8 +142,8 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 	if (Stream_GetRemainingLength(s) < bitmapDataByteCount)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-		         Stream_GetRemainingLength(s), bitmapDataByteCount);
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [%" PRIu32 " expected]",
+		           Stream_GetRemainingLength(s), bitmapDataByteCount);
 		return FALSE;
 	}
 
@@ -153,7 +154,7 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 	if ((paletteCount > 127) || (paletteCount < 1))
 	{
-		WLog_ERR(TAG, "paletteCount %" PRIu8 "", paletteCount);
+		WLog_Print(clear->log, WLOG_ERROR, "paletteCount %" PRIu8 "", paletteCount);
 		return FALSE;
 	}
 
@@ -181,7 +182,8 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 		if (Stream_GetRemainingLength(s) < 2)
 		{
-			WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+			WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+			           Stream_GetRemainingLength(s));
 			return FALSE;
 		}
 
@@ -196,7 +198,8 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 		{
 			if (Stream_GetRemainingLength(s) < 2)
 			{
-				WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+				WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+				           Stream_GetRemainingLength(s));
 				return FALSE;
 			}
 
@@ -207,8 +210,8 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 			{
 				if (Stream_GetRemainingLength(s) < 4)
 				{
-					WLog_ERR(TAG, "stream short %" PRIuz " [4 expected]",
-					         Stream_GetRemainingLength(s));
+					WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [4 expected]",
+					           Stream_GetRemainingLength(s));
 					return FALSE;
 				}
 
@@ -219,15 +222,15 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 		if (startIndex >= paletteCount)
 		{
-			WLog_ERR(TAG, "startIndex %" PRIu8 " > paletteCount %" PRIu8 "]", startIndex,
-			         paletteCount);
+			WLog_Print(clear->log, WLOG_ERROR, "startIndex %" PRIu8 " > paletteCount %" PRIu8 "]",
+			           startIndex, paletteCount);
 			return FALSE;
 		}
 
 		if (stopIndex >= paletteCount)
 		{
-			WLog_ERR(TAG, "stopIndex %" PRIu8 " > paletteCount %" PRIu8 "]", stopIndex,
-			         paletteCount);
+			WLog_Print(clear->log, WLOG_ERROR, "stopIndex %" PRIu8 " > paletteCount %" PRIu8 "]",
+			           stopIndex, paletteCount);
 			return FALSE;
 		}
 
@@ -235,7 +238,7 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 		if (suiteIndex > 127)
 		{
-			WLog_ERR(TAG, "suiteIndex %" PRIu8 " > 127]", suiteIndex);
+			WLog_Print(clear->log, WLOG_ERROR, "suiteIndex %" PRIu8 " > 127]", suiteIndex);
 			return FALSE;
 		}
 
@@ -243,10 +246,10 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 		if ((pixelIndex + runLengthFactor) > pixelCount)
 		{
-			WLog_ERR(TAG,
-			         "pixelIndex %" PRIu32 " + runLengthFactor %" PRIu32 " > pixelCount %" PRIu32
-			         "",
-			         pixelIndex, runLengthFactor, pixelCount);
+			WLog_Print(clear->log, WLOG_ERROR,
+			           "pixelIndex %" PRIu32 " + runLengthFactor %" PRIu32 " > pixelCount %" PRIu32
+			           "",
+			           pixelIndex, runLengthFactor, pixelCount);
 			return FALSE;
 		}
 
@@ -269,9 +272,10 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 		if ((pixelIndex + (suiteDepth + 1)) > pixelCount)
 		{
-			WLog_ERR(TAG,
-			         "pixelIndex %" PRIu32 " + suiteDepth %" PRIu8 " + 1 > pixelCount %" PRIu32 "",
-			         pixelIndex, suiteDepth, pixelCount);
+			WLog_Print(clear->log, WLOG_ERROR,
+			           "pixelIndex %" PRIu32 " + suiteDepth %" PRIu8 " + 1 > pixelCount %" PRIu32
+			           "",
+			           pixelIndex, suiteDepth, pixelCount);
 			return FALSE;
 		}
 
@@ -283,7 +287,7 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 			if (suiteIndex > 127)
 			{
-				WLog_ERR(TAG, "suiteIndex %" PRIu8 " > 127", suiteIndex);
+				WLog_Print(clear->log, WLOG_ERROR, "suiteIndex %" PRIu8 " > 127", suiteIndex);
 				return FALSE;
 			}
 
@@ -304,7 +308,8 @@ static BOOL clear_decompress_subcode_rlex(wStream* s, UINT32 bitmapDataByteCount
 
 	if (pixelIndex != pixelCount)
 	{
-		WLog_ERR(TAG, "pixelIndex %" PRIdz " != pixelCount %" PRIu32 "", pixelIndex, pixelCount);
+		WLog_Print(clear->log, WLOG_ERROR, "pixelIndex %" PRIdz " != pixelCount %" PRIu32 "",
+		           pixelIndex, pixelCount);
 		return FALSE;
 	}
 
@@ -326,7 +331,8 @@ static BOOL clear_resize_buffer(CLEAR_CONTEXT* clear, UINT32 width, UINT32 heigh
 
 		if (!tmp)
 		{
-			WLog_ERR(TAG, "clear->TempBuffer realloc failed for %" PRIu32 " bytes", size);
+			WLog_Print(clear->log, WLOG_ERROR,
+			           "clear->TempBuffer realloc failed for %" PRIu32 " bytes", size);
 			return FALSE;
 		}
 
@@ -352,8 +358,8 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 
 	if (Stream_GetRemainingLength(s) < residualByteCount)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-		         Stream_GetRemainingLength(s), residualByteCount);
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [%" PRIu32 " expected]",
+		           Stream_GetRemainingLength(s), residualByteCount);
 		return FALSE;
 	}
 
@@ -374,7 +380,8 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 
 		if (Stream_GetRemainingLength(s) < 4)
 		{
-			WLog_ERR(TAG, "stream short %" PRIuz " [4 expected]", Stream_GetRemainingLength(s));
+			WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [4 expected]",
+			           Stream_GetRemainingLength(s));
 			return FALSE;
 		}
 
@@ -389,7 +396,8 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 		{
 			if (Stream_GetRemainingLength(s) < 2)
 			{
-				WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+				WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+				           Stream_GetRemainingLength(s));
 				return FALSE;
 			}
 
@@ -400,8 +408,8 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 			{
 				if (Stream_GetRemainingLength(s) < 4)
 				{
-					WLog_ERR(TAG, "stream short %" PRIuz " [4 expected]",
-					         Stream_GetRemainingLength(s));
+					WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [4 expected]",
+					           Stream_GetRemainingLength(s));
 					return FALSE;
 				}
 
@@ -412,10 +420,10 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 
 		if ((pixelIndex + runLengthFactor) > pixelCount)
 		{
-			WLog_ERR(TAG,
-			         "pixelIndex %" PRIu32 " + runLengthFactor %" PRIu32 " > pixelCount %" PRIu32
-			         "",
-			         pixelIndex, runLengthFactor, pixelCount);
+			WLog_Print(clear->log, WLOG_ERROR,
+			           "pixelIndex %" PRIu32 " + runLengthFactor %" PRIu32 " > pixelCount %" PRIu32
+			           "",
+			           pixelIndex, runLengthFactor, pixelCount);
 			return FALSE;
 		}
 
@@ -432,7 +440,8 @@ static BOOL clear_decompress_residual_data(CLEAR_CONTEXT* clear, wStream* s,
 
 	if (pixelIndex != pixelCount)
 	{
-		WLog_ERR(TAG, "pixelIndex %" PRIu32 " != pixelCount %" PRIu32 "", pixelIndex, pixelCount);
+		WLog_Print(clear->log, WLOG_ERROR, "pixelIndex %" PRIu32 " != pixelCount %" PRIu32 "",
+		           pixelIndex, pixelCount);
 		return FALSE;
 	}
 
@@ -457,8 +466,8 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 
 	if (Stream_GetRemainingLength(s) < subcodecByteCount)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-		         Stream_GetRemainingLength(s), subcodecByteCount);
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [%" PRIu32 " expected]",
+		           Stream_GetRemainingLength(s), subcodecByteCount);
 		return FALSE;
 	}
 
@@ -471,7 +480,8 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 
 		if (Stream_GetRemainingLength(s) < 13)
 		{
-			WLog_ERR(TAG, "stream short %" PRIuz " [13 expected]", Stream_GetRemainingLength(s));
+			WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [13 expected]",
+			           Stream_GetRemainingLength(s));
 			return FALSE;
 		}
 
@@ -485,8 +495,8 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 
 		if (Stream_GetRemainingLength(s) < bitmapDataByteCount)
 		{
-			WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-			         Stream_GetRemainingLength(s), bitmapDataByteCount);
+			WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [%" PRIu32 " expected]",
+			           Stream_GetRemainingLength(s), bitmapDataByteCount);
 			return FALSE;
 		}
 
@@ -495,13 +505,15 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 
 		if (width > nWidth)
 		{
-			WLog_ERR(TAG, "width %" PRIu16 " > nWidth %" PRIu32 "", width, nWidth);
+			WLog_Print(clear->log, WLOG_ERROR, "width %" PRIu16 " > nWidth %" PRIu32 "", width,
+			           nWidth);
 			return FALSE;
 		}
 
 		if (height > nHeight)
 		{
-			WLog_ERR(TAG, "height %" PRIu16 " > nHeight %" PRIu32 "", height, nHeight);
+			WLog_Print(clear->log, WLOG_ERROR, "height %" PRIu16 " > nHeight %" PRIu32 "", height,
+			           nHeight);
 			return FALSE;
 		}
 
@@ -517,8 +529,9 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 
 				if (bitmapDataByteCount != nSrcSize)
 				{
-					WLog_ERR(TAG, "bitmapDataByteCount %" PRIu32 " != nSrcSize %" PRIu32 "",
-					         bitmapDataByteCount, nSrcSize);
+					WLog_Print(clear->log, WLOG_ERROR,
+					           "bitmapDataByteCount %" PRIu32 " != nSrcSize %" PRIu32 "",
+					           bitmapDataByteCount, nSrcSize);
 					return FALSE;
 				}
 
@@ -532,22 +545,23 @@ static BOOL clear_decompress_subcodecs_data(CLEAR_CONTEXT* clear, wStream* s,
 			break;
 
 			case 1: /* NSCodec */
-				if (!clear_decompress_nscodec(clear->nsc, width, height, s, bitmapDataByteCount,
-				                              pDstData, DstFormat, nDstStep, nXDstRel, nYDstRel))
+				if (!clear_decompress_nscodec(clear, clear->nsc, width, height, s,
+				                              bitmapDataByteCount, pDstData, DstFormat, nDstStep,
+				                              nXDstRel, nYDstRel))
 					return FALSE;
 
 				break;
 
 			case 2: /* CLEARCODEC_SUBCODEC_RLEX */
-				if (!clear_decompress_subcode_rlex(s, bitmapDataByteCount, width, height, pDstData,
-				                                   DstFormat, nDstStep, nXDstRel, nYDstRel,
-				                                   nDstWidth, nDstHeight))
+				if (!clear_decompress_subcode_rlex(clear, s, bitmapDataByteCount, width, height,
+				                                   pDstData, DstFormat, nDstStep, nXDstRel,
+				                                   nYDstRel, nDstWidth, nDstHeight))
 					return FALSE;
 
 				break;
 
 			default:
-				WLog_ERR(TAG, "Unknown subcodec ID %" PRIu8 "", subcodecId);
+				WLog_Print(clear->log, WLOG_ERROR, "Unknown subcodec ID %" PRIu8 "", subcodecId);
 				return FALSE;
 		}
 
@@ -570,7 +584,8 @@ static BOOL resize_vbar_entry(CLEAR_CONTEXT* clear, CLEAR_VBAR_ENTRY* vBarEntry)
 
 		if (!tmp)
 		{
-			WLog_ERR(TAG, "vBarEntry->pixels realloc %" PRIu32 " failed", vBarEntry->count * bpp);
+			WLog_Print(clear->log, WLOG_ERROR, "vBarEntry->pixels realloc %" PRIu32 " failed",
+			           vBarEntry->count * bpp);
 			return FALSE;
 		}
 
@@ -580,8 +595,8 @@ static BOOL resize_vbar_entry(CLEAR_CONTEXT* clear, CLEAR_VBAR_ENTRY* vBarEntry)
 
 	if (!vBarEntry->pixels && vBarEntry->size)
 	{
-		WLog_ERR(TAG, "vBarEntry->pixels is NULL but vBarEntry->size is %" PRIu32 "",
-		         vBarEntry->size);
+		WLog_Print(clear->log, WLOG_ERROR,
+		           "vBarEntry->pixels is NULL but vBarEntry->size is %" PRIu32 "", vBarEntry->size);
 		return FALSE;
 	}
 
@@ -601,7 +616,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 	if (Stream_GetRemainingLength(s) < bandsByteCount)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [11 expected]", Stream_GetRemainingLength(s));
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [11 expected]",
+		           Stream_GetRemainingLength(s));
 		return FALSE;
 	}
 
@@ -624,7 +640,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 		if (Stream_GetRemainingLength(s) < 11)
 		{
-			WLog_ERR(TAG, "stream short %" PRIuz " [11 expected]", Stream_GetRemainingLength(s));
+			WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [11 expected]",
+			           Stream_GetRemainingLength(s));
 			return FALSE;
 		}
 
@@ -640,13 +657,15 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 		if (xEnd < xStart)
 		{
-			WLog_ERR(TAG, "xEnd %" PRIu16 " < xStart %" PRIu16 "", xEnd, xStart);
+			WLog_Print(clear->log, WLOG_ERROR, "xEnd %" PRIu16 " < xStart %" PRIu16 "", xEnd,
+			           xStart);
 			return FALSE;
 		}
 
 		if (yEnd < yStart)
 		{
-			WLog_ERR(TAG, "yEnd %" PRIu16 " < yStart %" PRIu16 "", yEnd, yStart);
+			WLog_Print(clear->log, WLOG_ERROR, "yEnd %" PRIu16 " < yStart %" PRIu16 "", yEnd,
+			           yStart);
 			return FALSE;
 		}
 
@@ -662,7 +681,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 			if (Stream_GetRemainingLength(s) < 2)
 			{
-				WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+				WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+				           Stream_GetRemainingLength(s));
 				return FALSE;
 			}
 
@@ -672,7 +692,7 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 			if (vBarHeight > 52)
 			{
-				WLog_ERR(TAG, "vBarHeight (%" PRIu32 ") > 52", vBarHeight);
+				WLog_Print(clear->log, WLOG_ERROR, "vBarHeight (%" PRIu32 ") > 52", vBarHeight);
 				return FALSE;
 			}
 
@@ -683,14 +703,15 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 				if (!vBarShortEntry)
 				{
-					WLog_ERR(TAG, "missing vBarShortEntry %" PRIu16 "", vBarIndex);
+					WLog_Print(clear->log, WLOG_ERROR, "missing vBarShortEntry %" PRIu16 "",
+					           vBarIndex);
 					return FALSE;
 				}
 
 				if (Stream_GetRemainingLength(s) < 1)
 				{
-					WLog_ERR(TAG, "stream short %" PRIuz " [1 expected]",
-					         Stream_GetRemainingLength(s));
+					WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [1 expected]",
+					           Stream_GetRemainingLength(s));
 					return FALSE;
 				}
 
@@ -706,7 +727,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 				if (vBarYOff < vBarYOn)
 				{
-					WLog_ERR(TAG, "vBarYOff %" PRIu16 " < vBarYOn %" PRIu16 "", vBarYOff, vBarYOn);
+					WLog_Print(clear->log, WLOG_ERROR, "vBarYOff %" PRIu16 " < vBarYOn %" PRIu16 "",
+					           vBarYOff, vBarYOn);
 					return FALSE;
 				}
 
@@ -714,23 +736,25 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 				if (vBarShortPixelCount > 52)
 				{
-					WLog_ERR(TAG, "vBarShortPixelCount %" PRIu32 " > 52", vBarShortPixelCount);
+					WLog_Print(clear->log, WLOG_ERROR, "vBarShortPixelCount %" PRIu32 " > 52",
+					           vBarShortPixelCount);
 					return FALSE;
 				}
 
 				if (Stream_GetRemainingLength(s) < (vBarShortPixelCount * 3))
 				{
-					WLog_ERR(TAG, "stream short %" PRIuz " [%" PRIu32 " expected]",
-					         Stream_GetRemainingLength(s), (vBarShortPixelCount * 3));
+					WLog_Print(clear->log, WLOG_ERROR,
+					           "stream short %" PRIuz " [%" PRIu32 " expected]",
+					           Stream_GetRemainingLength(s), (vBarShortPixelCount * 3));
 					return FALSE;
 				}
 
 				if (clear->ShortVBarStorageCursor >= CLEARCODEC_VBAR_SHORT_SIZE)
 				{
-					WLog_ERR(TAG,
-					         "clear->ShortVBarStorageCursor %" PRIu32
-					         " >= CLEARCODEC_VBAR_SHORT_SIZE (%" PRIu32 ")",
-					         clear->ShortVBarStorageCursor, CLEARCODEC_VBAR_SHORT_SIZE);
+					WLog_Print(clear->log, WLOG_ERROR,
+					           "clear->ShortVBarStorageCursor %" PRIu32
+					           " >= CLEARCODEC_VBAR_SHORT_SIZE (%" PRIu32 ")",
+					           clear->ShortVBarStorageCursor, CLEARCODEC_VBAR_SHORT_SIZE);
 					return FALSE;
 				}
 
@@ -767,7 +791,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 				/* If the cache was reset we need to fill in some dummy data. */
 				if (vBarEntry->size == 0)
 				{
-					WLog_WARN(TAG, "Empty cache index %" PRIu16 ", filling dummy data", vBarIndex);
+					WLog_Print(clear->log, WLOG_WARN,
+					           "Empty cache index %" PRIu16 ", filling dummy data", vBarIndex);
 					vBarEntry->count = vBarHeight;
 
 					if (!resize_vbar_entry(clear, vBarEntry))
@@ -776,7 +801,8 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 			}
 			else
 			{
-				WLog_ERR(TAG, "invalid vBarHeader 0x%04" PRIX16 "", vBarHeader);
+				WLog_Print(clear->log, WLOG_ERROR, "invalid vBarHeader 0x%04" PRIX16 "",
+				           vBarHeader);
 				return FALSE; /* invalid vBarHeader */
 			}
 
@@ -788,10 +814,10 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 				if (clear->VBarStorageCursor >= CLEARCODEC_VBAR_SIZE)
 				{
-					WLog_ERR(TAG,
-					         "clear->VBarStorageCursor %" PRIu32 " >= CLEARCODEC_VBAR_SIZE %" PRIu32
-					         "",
-					         clear->VBarStorageCursor, CLEARCODEC_VBAR_SIZE);
+					WLog_Print(clear->log, WLOG_ERROR,
+					           "clear->VBarStorageCursor %" PRIu32
+					           " >= CLEARCODEC_VBAR_SIZE %" PRIu32 "",
+					           clear->VBarStorageCursor, CLEARCODEC_VBAR_SIZE);
 					return FALSE;
 				}
 
@@ -860,8 +886,9 @@ static BOOL clear_decompress_bands_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 			if (vBarEntry->count != vBarHeight)
 			{
-				WLog_ERR(TAG, "vBarEntry->count %" PRIu32 " != vBarHeight %" PRIu32 "",
-				         vBarEntry->count, vBarHeight);
+				WLog_Print(clear->log, WLOG_ERROR,
+				           "vBarEntry->count %" PRIu32 " != vBarHeight %" PRIu32 "",
+				           vBarEntry->count, vBarHeight);
 				vBarEntry->count = vBarHeight;
 
 				if (!resize_vbar_entry(clear, vBarEntry))
@@ -911,7 +938,7 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 	if ((glyphFlags & CLEARCODEC_FLAG_GLYPH_HIT) && !(glyphFlags & CLEARCODEC_FLAG_GLYPH_INDEX))
 	{
-		WLog_ERR(TAG, "Invalid glyph flags %08" PRIX32 "", glyphFlags);
+		WLog_Print(clear->log, WLOG_ERROR, "Invalid glyph flags %08" PRIX32 "", glyphFlags);
 		return FALSE;
 	}
 
@@ -920,13 +947,15 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 	if ((nWidth * nHeight) > (1024 * 1024))
 	{
-		WLog_ERR(TAG, "glyph too large: %" PRIu32 "x%" PRIu32 "", nWidth, nHeight);
+		WLog_Print(clear->log, WLOG_ERROR, "glyph too large: %" PRIu32 "x%" PRIu32 "", nWidth,
+		           nHeight);
 		return FALSE;
 	}
 
 	if (Stream_GetRemainingLength(s) < 2)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+		           Stream_GetRemainingLength(s));
 		return FALSE;
 	}
 
@@ -934,7 +963,7 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 	if (glyphIndex >= 4000)
 	{
-		WLog_ERR(TAG, "Invalid glyphIndex %" PRIu16 "", glyphIndex);
+		WLog_Print(clear->log, WLOG_ERROR, "Invalid glyphIndex %" PRIu16 "", glyphIndex);
 		return FALSE;
 	}
 
@@ -946,7 +975,7 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 		if (!glyphEntry)
 		{
-			WLog_ERR(TAG, "clear->GlyphCache[%" PRIu16 "]=NULL", glyphIndex);
+			WLog_Print(clear->log, WLOG_ERROR, "clear->GlyphCache[%" PRIu16 "]=NULL", glyphIndex);
 			return FALSE;
 		}
 
@@ -954,15 +983,16 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 		if (!glyphData)
 		{
-			WLog_ERR(TAG, "clear->GlyphCache[%" PRIu16 "]->pixels=NULL", glyphIndex);
+			WLog_Print(clear->log, WLOG_ERROR, "clear->GlyphCache[%" PRIu16 "]->pixels=NULL",
+			           glyphIndex);
 			return FALSE;
 		}
 
 		if ((nWidth * nHeight) > glyphEntry->count)
 		{
-			WLog_ERR(TAG,
-			         "(nWidth %" PRIu32 " * nHeight %" PRIu32 ") > glyphEntry->count %" PRIu32 "",
-			         nWidth, nHeight, glyphEntry->count);
+			WLog_Print(clear->log, WLOG_ERROR,
+			           "(nWidth %" PRIu32 " * nHeight %" PRIu32 ") > glyphEntry->count %" PRIu32 "",
+			           nWidth, nHeight, glyphEntry->count);
 			return FALSE;
 		}
 
@@ -984,8 +1014,8 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 			if (!tmp)
 			{
-				WLog_ERR(TAG, "glyphEntry->pixels realloc %" PRIu32 " failed!",
-				         glyphEntry->count * bpp);
+				WLog_Print(clear->log, WLOG_ERROR, "glyphEntry->pixels realloc %" PRIu32 " failed!",
+				           glyphEntry->count * bpp);
 				return FALSE;
 			}
 
@@ -995,7 +1025,7 @@ static BOOL clear_decompress_glyph_data(CLEAR_CONTEXT* clear, wStream* s, UINT32
 
 		if (!glyphEntry->pixels)
 		{
-			WLog_ERR(TAG, "glyphEntry->pixels=NULL");
+			WLog_Print(clear->log, WLOG_ERROR, "glyphEntry->pixels=NULL");
 			return FALSE;
 		}
 
@@ -1049,7 +1079,8 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 
 	if (Stream_GetRemainingLength(s) < 2)
 	{
-		WLog_ERR(TAG, "stream short %" PRIuz " [2 expected]", Stream_GetRemainingLength(s));
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [2 expected]",
+		           Stream_GetRemainingLength(s));
 		goto fail;
 	}
 
@@ -1064,10 +1095,10 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 
 	if (seqNumber != clear->seqNumber)
 	{
-		WLog_ERR(TAG, "Sequence number unexpected %" PRIu8 " - %" PRIu32 "", seqNumber,
-		         clear->seqNumber);
-		WLog_ERR(TAG, "seqNumber %" PRIu8 " != clear->seqNumber %" PRIu32 "", seqNumber,
-		         clear->seqNumber);
+		WLog_Print(clear->log, WLOG_ERROR, "Sequence number unexpected %" PRIu8 " - %" PRIu32 "",
+		           seqNumber, clear->seqNumber);
+		WLog_Print(clear->log, WLOG_ERROR, "seqNumber %" PRIu8 " != clear->seqNumber %" PRIu32 "",
+		           seqNumber, clear->seqNumber);
 		goto fail;
 	}
 
@@ -1083,7 +1114,7 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 	                                 nDstStep, nXDst, nYDst, nDstWidth, nDstHeight, palette,
 	                                 &glyphData))
 	{
-		WLog_ERR(TAG, "clear_decompress_glyph_data failed!");
+		WLog_Print(clear->log, WLOG_ERROR, "clear_decompress_glyph_data failed!");
 		goto fail;
 	}
 
@@ -1095,7 +1126,8 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 		if ((glyphFlags & mask) == mask)
 			goto finish;
 
-		WLog_ERR(TAG, "stream short %" PRIuz " [12 expected]", Stream_GetRemainingLength(s));
+		WLog_Print(clear->log, WLOG_ERROR, "stream short %" PRIuz " [12 expected]",
+		           Stream_GetRemainingLength(s));
 		goto fail;
 	}
 
@@ -1109,7 +1141,7 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 		                                    DstFormat, nDstStep, nXDst, nYDst, nDstWidth,
 		                                    nDstHeight, palette))
 		{
-			WLog_ERR(TAG, "clear_decompress_residual_data failed!");
+			WLog_Print(clear->log, WLOG_ERROR, "clear_decompress_residual_data failed!");
 			goto fail;
 		}
 	}
@@ -1119,7 +1151,7 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 		if (!clear_decompress_bands_data(clear, s, bandsByteCount, nWidth, nHeight, pDstData,
 		                                 DstFormat, nDstStep, nXDst, nYDst))
 		{
-			WLog_ERR(TAG, "clear_decompress_bands_data failed!");
+			WLog_Print(clear->log, WLOG_ERROR, "clear_decompress_bands_data failed!");
 			goto fail;
 		}
 	}
@@ -1130,7 +1162,7 @@ INT32 clear_decompress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSiz
 		                                     DstFormat, nDstStep, nXDst, nYDst, nDstWidth,
 		                                     nDstHeight, palette))
 		{
-			WLog_ERR(TAG, "clear_decompress_subcodecs_data failed!");
+			WLog_Print(clear->log, WLOG_ERROR, "clear_decompress_subcodecs_data failed!");
 			goto fail;
 		}
 	}
@@ -1152,9 +1184,10 @@ fail:
 int clear_compress(CLEAR_CONTEXT* clear, const BYTE* pSrcData, UINT32 SrcSize, BYTE** ppDstData,
                    UINT32* pDstSize)
 {
-	WLog_ERR(TAG, "TODO: %s not implemented!", __FUNCTION__);
+	WLog_Print(clear->log, WLOG_ERROR, "TODO: %s not implemented!", __FUNCTION__);
 	return 1;
 }
+
 BOOL clear_context_reset(CLEAR_CONTEXT* clear)
 {
 	if (!clear)
@@ -1163,6 +1196,16 @@ BOOL clear_context_reset(CLEAR_CONTEXT* clear)
 	clear->seqNumber = 0;
 	return TRUE;
 }
+
+BOOL clear_set_log_context(CLEAR_CONTEXT* clear, void* context)
+{
+	if (!clear)
+		return FALSE;
+	if (!nsc_set_log_context(clear->nsc, context))
+		return FALSE;
+	return WLog_SetContext(clear->log, context);
+}
+
 CLEAR_CONTEXT* clear_context_new(BOOL Compressor)
 {
 	CLEAR_CONTEXT* clear;
@@ -1171,29 +1214,33 @@ CLEAR_CONTEXT* clear_context_new(BOOL Compressor)
 	if (!clear)
 		return NULL;
 
+	clear->log = WLog_Get(FREERDP_TAG("codec.clear"));
+	if (!clear->log)
+		goto fail;
 	clear->Compressor = Compressor;
 	clear->nsc = nsc_context_new();
 
 	if (!clear->nsc)
-		goto error_nsc;
+		goto fail;
 
 	if (!updateContextFormat(clear, PIXEL_FORMAT_BGRX32))
-		goto error_nsc;
+		goto fail;
 
 	if (!clear_resize_buffer(clear, 512, 512))
-		goto error_nsc;
+		goto fail;
 
 	if (!clear->TempBuffer)
-		goto error_nsc;
+		goto fail;
 
 	if (!clear_context_reset(clear))
-		goto error_nsc;
+		goto fail;
 
 	return clear;
-error_nsc:
+fail:
 	clear_context_free(clear);
 	return NULL;
 }
+
 void clear_context_free(CLEAR_CONTEXT* clear)
 {
 	int i;

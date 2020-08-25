@@ -102,6 +102,8 @@ extern "C"
 	typedef struct _wLogAppender wLogAppender;
 	typedef struct _wLog wLog;
 
+	typedef const char* (*wlog_context_formatter)(wLog*);
+
 #define WLOG_PACKET_INBOUND 1
 #define WLOG_PACKET_OUTBOUND 2
 
@@ -112,6 +114,11 @@ extern "C"
 
 	WINPR_API wLog* WLog_GetRoot(void);
 	WINPR_API wLog* WLog_Get(LPCSTR name);
+	WINPR_API BOOL WLog_SetContext(wLog* log, const void* context);
+	WINPR_API const void* WLog_GetContext(wLog* log);
+	WINPR_API BOOL WLog_SetContextFormatter(wLog* log, wlog_context_formatter);
+	WINPR_API wlog_context_formatter WLog_GetContextFormatter(wLog* log);
+
 	WINPR_API DWORD WLog_GetLogLevel(wLog* log);
 	WINPR_API BOOL WLog_IsLevelActive(wLog* _log, DWORD _log_level);
 
@@ -125,12 +132,23 @@ extern "C"
 		}                                                                              \
 	} while (0)
 
-#define WLog_Print_tag(_tag, _log_level, ...)                 \
+#define WLog_Print_tag(_tag, _log_level, ...)                                            \
+	do                                                                                   \
+	{                                                                                    \
+		static wLog* _log_cached_ptr = NULL;                                             \
+		if (!_log_cached_ptr)                                                            \
+			_log_cached_ptr = WLog_Get(_tag);                                            \
+		WLog_Print(_log_cached_ptr, WLOG_WARN, "Macro deprecated, upgrade to WLogEx_*"); \
+		WLog_Print(_log_cached_ptr, _log_level, __VA_ARGS__);                            \
+	} while (0)
+
+#define WLogEx_Print_tag(_tag, context, _log_level, ...)      \
 	do                                                        \
 	{                                                         \
 		static wLog* _log_cached_ptr = NULL;                  \
 		if (!_log_cached_ptr)                                 \
 			_log_cached_ptr = WLog_Get(_tag);                 \
+		WLog_SetContext(_log_cached_ptr, context);            \
 		WLog_Print(_log_cached_ptr, _log_level, __VA_ARGS__); \
 	} while (0)
 
@@ -174,13 +192,21 @@ extern "C"
 		}                                                                                \
 	} while (0)
 
+#define WLogEx_LVL(tag, context, lvl, ...) WLogEx_Print_tag(tag, context, lvl, __VA_ARGS__)
+#define WLogEx_VRB(tag, context, ...) WLogEx_LVL(tag, context, WLOG_TRACE, __VA_ARGS__)
+#define WLogEx_DBG(tag, context, ...) WLogEx_LVL(tag, context, WLOG_DEBUG, __VA_ARGS__)
+#define WLogEx_INFO(tag, context, ...) WLogEx_LVL(tag, context, WLOG_INFO, __VA_ARGS__)
+#define WLogEx_WARN(tag, context, ...) WLogEx_LVL(tag, context, WLOG_WARN, __VA_ARGS__)
+#define WLogEx_ERR(tag, context, ...) WLogEx_LVL(tag, context, WLOG_ERROR, __VA_ARGS__)
+#define WLogEx_FATAL(tag, context, ...) WLogEx_LVL(tag, context, WLOG_FATAL, __VA_ARGS__)
+
 #define WLog_LVL(tag, lvl, ...) WLog_Print_tag(tag, lvl, __VA_ARGS__)
-#define WLog_VRB(tag, ...) WLog_Print_tag(tag, WLOG_TRACE, __VA_ARGS__)
-#define WLog_DBG(tag, ...) WLog_Print_tag(tag, WLOG_DEBUG, __VA_ARGS__)
-#define WLog_INFO(tag, ...) WLog_Print_tag(tag, WLOG_INFO, __VA_ARGS__)
-#define WLog_WARN(tag, ...) WLog_Print_tag(tag, WLOG_WARN, __VA_ARGS__)
-#define WLog_ERR(tag, ...) WLog_Print_tag(tag, WLOG_ERROR, __VA_ARGS__)
-#define WLog_FATAL(tag, ...) WLog_Print_tag(tag, WLOG_FATAL, __VA_ARGS__)
+#define WLog_VRB(tag, ...) WLog_LVL(tag, WLOG_TRACE, __VA_ARGS__)
+#define WLog_DBG(tag, ...) WLog_LVL(tag, WLOG_DEBUG, __VA_ARGS__)
+#define WLog_INFO(tag, ...) WLog_LVL(tag, WLOG_INFO, __VA_ARGS__)
+#define WLog_WARN(tag, ...) WLog_LVL(tag, WLOG_WARN, __VA_ARGS__)
+#define WLog_ERR(tag, ...) WLog_LVL(tag, WLOG_ERROR, __VA_ARGS__)
+#define WLog_FATAL(tag, ...) WLog_LVL(tag, WLOG_FATAL, __VA_ARGS__)
 
 	WINPR_API BOOL WLog_SetLogLevel(wLog* log, DWORD logLevel);
 	WINPR_API BOOL WLog_SetStringLogLevel(wLog* log, LPCSTR level);

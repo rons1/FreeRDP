@@ -65,6 +65,8 @@ extern "C"
 	FREERDP_API NSC_CONTEXT* nsc_context_new(void);
 	FREERDP_API void nsc_context_free(NSC_CONTEXT* context);
 
+	FREERDP_API BOOL nsc_set_log_context(NSC_CONTEXT* nsc, void* context);
+
 #ifdef __cplusplus
 }
 #endif

@@ -78,6 +78,9 @@ struct _wLog
 	wLog** Children;
 	DWORD ChildrenCount;
 	DWORD ChildrenSize;
+	wlog_context_formatter formatter;
+	const void* Context;
+	LPSTR ContextString;
 };
 
 BOOL WLog_Layout_GetMessagePrefix(wLog* log, wLogLayout* layout, wLogMessage* message);
