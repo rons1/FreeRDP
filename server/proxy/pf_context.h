@@ -113,6 +113,7 @@ struct proxy_data
 
 	/* used to external modules to store per-session info */
 	wHashTable* modules_info;
+	wLog* log;
 };
 
 BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src);

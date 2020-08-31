@@ -1306,12 +1306,11 @@ BOOL rdp_server_accept_mcs_connect_initial(rdpRdp* rdp, wStream* s)
 	if (!mcs_recv_connect_initial(mcs, s))
 		return FALSE;
 
-	WLog_INFO(TAG, "Accepted client: %s", rdp->settings->ClientHostname);
-	WLog_INFO(TAG, "Accepted channels:");
+	WLogEx_INFO(TAG, rdp->context, "Accepted client: %s", rdp->settings->ClientHostname);
 
 	for (i = 0; i < mcs->channelCount; i++)
 	{
-		WLog_INFO(TAG, " %s", mcs->channels[i].Name);
+		WLogEx_INFO(TAG, rdp->context, "Accepted channels: %s", mcs->channels[i].Name);
 	}
 
 	if (!mcs_send_connect_response(mcs))

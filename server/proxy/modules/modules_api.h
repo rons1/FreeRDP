@@ -61,6 +61,7 @@ typedef struct proxy_plugin
 	proxyFilterFn MouseEvent;
 	proxyFilterFn ClientChannelData; /* passthrough channels data */
 	proxyFilterFn ServerChannelData; /* passthrough channels data */
+	proxyFilterFn Log;               /* log */
 } proxyPlugin;
 
 /*

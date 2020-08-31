@@ -232,7 +232,9 @@ proxyData* proxy_data_new(void)
 	pdata->modules_info->keyClone = HashTable_StringClone;
 	pdata->modules_info->keyFree = HashTable_StringFree;
 
+	pdata->log = WLog_Get("proxy.session");
 	return pdata;
+
 error:
 	proxy_data_free(pdata);
 	return NULL;

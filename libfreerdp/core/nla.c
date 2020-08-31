@@ -47,6 +47,8 @@
 
 #include "nla.h"
 
+#define TAG "libfreerdp.core.nla"
+
 #define SERVER_KEY "Software\\" FREERDP_VENDOR_STRING "\\" FREERDP_PRODUCT_STRING "\\Server"
 
 /**
@@ -1369,9 +1371,9 @@ SECURITY_STATUS nla_decrypt_public_key_echo(rdpNla* nla)
 		WLog_Print(nla->log, WLOG_ERROR, "Could not verify server's public key echo");
 #if defined(WITH_DEBUG_NLA)
 		WLog_Print(nla->log, WLOG_ERROR, "Expected (length = %d):", public_key_length);
-		winpr_HexDumpEx(TAG, context, WLOG_ERROR, public_key1, public_key_length);
+		winpr_HexDumpEx(TAG, nla->instance->context, WLOG_ERROR, public_key1, public_key_length);
 		WLog_Print(nla->log, WLOG_ERROR, "Actual (length = %d):", public_key_length);
-		winpr_HexDumpEx(TAG, context, WLOG_ERROR, public_key2, public_key_length);
+		winpr_HexDumpEx(TAG, nla->instance->context, WLOG_ERROR, public_key2, public_key_length);
 #endif
 		status = SEC_E_MESSAGE_ALTERED; /* DO NOT SEND CREDENTIALS! */
 		goto fail;
@@ -2247,7 +2249,8 @@ void nla_buffer_print(rdpNla* nla)
 		WLog_Print(nla->log, WLOG_DEBUG,
 		           "NLA.negoToken (length = %" PRIu32 "):", nla->negoToken.cbBuffer);
 #if defined(WITH_DEBUG_NLA)
-		winpr_HexDumpEx(TAG, context, WLOG_DEBUG, nla->negoToken.pvBuffer, nla->negoToken.cbBuffer);
+		winpr_HexDumpEx(TAG, nla->instance->context, WLOG_DEBUG, nla->negoToken.pvBuffer,
+		                nla->negoToken.cbBuffer);
 #endif
 	}
 
@@ -2256,7 +2259,7 @@ void nla_buffer_print(rdpNla* nla)
 		WLog_Print(nla->log, WLOG_DEBUG,
 		           "NLA.pubKeyAuth (length = %" PRIu32 "):", nla->pubKeyAuth.cbBuffer);
 #if defined(WITH_DEBUG_NLA)
-		winpr_HexDumpEx(TAG, context, WLOG_DEBUG, nla->pubKeyAuth.pvBuffer,
+		winpr_HexDumpEx(TAG, nla->instance->context, WLOG_DEBUG, nla->pubKeyAuth.pvBuffer,
 		                nla->pubKeyAuth.cbBuffer);
 #endif
 	}
@@ -2266,7 +2269,8 @@ void nla_buffer_print(rdpNla* nla)
 		WLog_Print(nla->log, WLOG_DEBUG,
 		           "NLA.authInfo (length = %" PRIu32 "):", nla->authInfo.cbBuffer);
 #if defined(WITH_DEBUG_NLA)
-		winpr_HexDumpEx(TAG, context, WLOG_DEBUG, nla->authInfo.pvBuffer, nla->authInfo.cbBuffer);
+		winpr_HexDumpEx(TAG, nla->instance->context, WLOG_DEBUG, nla->authInfo.pvBuffer,
+		                nla->authInfo.cbBuffer);
 #endif
 	}
 }

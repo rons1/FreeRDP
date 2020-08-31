@@ -878,18 +878,18 @@ void freerdp_set_last_error_ex(rdpContext* context, UINT32 lastError, const char
                                const char* file, int line)
 {
 	if (lastError)
-		WLog_ERR(TAG, "%s:%s %s [0x%08" PRIX32 "]", fkt, __FUNCTION__,
-		         freerdp_get_last_error_name(lastError), lastError);
+		WLogEx_ERR(TAG, context, "%s:%s %s [0x%08" PRIX32 "]", fkt, __FUNCTION__,
+		           freerdp_get_last_error_name(lastError), lastError);
 
 	if (lastError == FREERDP_ERROR_SUCCESS)
 	{
-		WLog_INFO(TAG, "%s:%s resetting error state", fkt, __FUNCTION__);
+		WLogEx_INFO(TAG, context, "%s:%s resetting error state", fkt, __FUNCTION__);
 	}
 	else if (context->LastError != FREERDP_ERROR_SUCCESS)
 	{
-		WLog_ERR(TAG, "%s: TODO: Trying to set error code %s, but %s already set!", fkt,
-		         freerdp_get_last_error_name(lastError),
-		         freerdp_get_last_error_name(context->LastError));
+		WLogEx_ERR(TAG, context, "%s: TODO: Trying to set error code %s, but %s already set!", fkt,
+		           freerdp_get_last_error_name(lastError),
+		           freerdp_get_last_error_name(context->LastError));
 	}
 
 	context->LastError = lastError;
