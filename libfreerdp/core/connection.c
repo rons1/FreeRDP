@@ -1217,12 +1217,13 @@ BOOL rdp_server_accept_nego(rdpRdp* rdp, wStream* s)
 		return FALSE;
 
 	RequestedProtocols = nego_get_requested_protocols(nego);
-	WLog_INFO(TAG, "Client Security: NLA:%d TLS:%d RDP:%d",
-	          (RequestedProtocols & PROTOCOL_HYBRID) ? 1 : 0,
-	          (RequestedProtocols & PROTOCOL_SSL) ? 1 : 0,
-	          (RequestedProtocols == PROTOCOL_RDP) ? 1 : 0);
-	WLog_INFO(TAG, "Server Security: NLA:%" PRId32 " TLS:%" PRId32 " RDP:%" PRId32 "",
-	          settings->NlaSecurity, settings->TlsSecurity, settings->RdpSecurity);
+	WLogEx_INFO(TAG, rdp->context, "Client Security: NLA:%d TLS:%d RDP:%d",
+	            (RequestedProtocols & PROTOCOL_HYBRID) ? 1 : 0,
+	            (RequestedProtocols & PROTOCOL_SSL) ? 1 : 0,
+	            (RequestedProtocols == PROTOCOL_RDP) ? 1 : 0);
+	WLogEx_INFO(TAG, rdp->context,
+	            "Server Security: NLA:%" PRId32 " TLS:%" PRId32 " RDP:%" PRId32 "",
+	            settings->NlaSecurity, settings->TlsSecurity, settings->RdpSecurity);
 
 	if ((settings->NlaSecurity) && (RequestedProtocols & PROTOCOL_HYBRID))
 	{
@@ -1246,32 +1247,33 @@ BOOL rdp_server_accept_nego(rdpRdp* rdp, wStream* s)
 
 		if (settings->RdpSecurity)
 		{
-			WLog_ERR(TAG, "server supports only Standard RDP Security");
+			WLogEx_ERR(TAG, rdp->context, "server supports only Standard RDP Security");
 			SelectedProtocol |= SSL_NOT_ALLOWED_BY_SERVER;
 		}
 		else
 		{
 			if (settings->NlaSecurity && !settings->TlsSecurity)
 			{
-				WLog_WARN(TAG, "server supports only NLA Security");
+				WLogEx_WARN(TAG, rdp->context, "server supports only NLA Security");
 				SelectedProtocol |= HYBRID_REQUIRED_BY_SERVER;
 			}
 			else
 			{
-				WLog_WARN(TAG, "server supports only a SSL based Security (TLS or NLA)");
+				WLogEx_WARN(TAG, rdp->context,
+				            "server supports only a SSL based Security (TLS or NLA)");
 				SelectedProtocol |= SSL_REQUIRED_BY_SERVER;
 			}
 		}
 
-		WLog_ERR(TAG, "Protocol security negotiation failure");
+		WLogEx_ERR(TAG, rdp->context, "Protocol security negotiation failure");
 	}
 
 	if (!(SelectedProtocol & PROTOCOL_FAILED_NEGO))
 	{
-		WLog_INFO(TAG, "Negotiated Security: NLA:%d TLS:%d RDP:%d",
-		          (SelectedProtocol & PROTOCOL_HYBRID) ? 1 : 0,
-		          (SelectedProtocol & PROTOCOL_SSL) ? 1 : 0,
-		          (SelectedProtocol == PROTOCOL_RDP) ? 1 : 0);
+		WLogEx_INFO(TAG, rdp->context, "Negotiated Security: NLA:%d TLS:%d RDP:%d",
+		            (SelectedProtocol & PROTOCOL_HYBRID) ? 1 : 0,
+		            (SelectedProtocol & PROTOCOL_SSL) ? 1 : 0,
+		            (SelectedProtocol == PROTOCOL_RDP) ? 1 : 0);
 	}
 
 	if (!nego_set_selected_protocol(nego, SelectedProtocol))

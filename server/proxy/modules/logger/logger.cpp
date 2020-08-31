@@ -43,27 +43,49 @@ enum severity
 static BOOL log_msg(proxyData* pdata, void* param)
 {
 	auto msg = static_cast<wLogMessage*>(param);
-	spdlog::level_t level;
 
-	switch (msg->Level)
+	const rdpContext* context = (rdpContext*)pdata;
+	if (!context)
 	{
-		case WLOG_INFO:
-			spdlog::info("[{}] {}", (void*)pdata, msg->TextString);
-			break;
-		case WLOG_ERROR:
-			spdlog::warn("[{}] {}", (void*)pdata, msg->TextString);
-			level = spdlog::level::err;
-			break;
-		case WLOG_DEBUG:
-			spdlog::debug("[{}] {}", (void*)pdata, msg->TextString);
-			level = spdlog::level::debug;
-			break;
-		case WLOG_WARN:
-			spdlog::warn("[{}] {}", (void*)pdata, msg->TextString);
-			level = spdlog::level::warn;
-			break;
-		default:
-			return TRUE;
+		switch (msg->Level)
+		{
+			case WLOG_INFO:
+				spdlog::info("{}", msg->TextString);
+				break;
+			case WLOG_ERROR:
+				spdlog::warn("{}", msg->TextString);
+				break;
+			case WLOG_DEBUG:
+				spdlog::debug("{}", msg->TextString);
+				break;
+			case WLOG_WARN:
+				spdlog::warn("{}", msg->TextString);
+				break;
+			default:
+				return TRUE;
+		}
+	}
+	else
+	{
+		const char* session_id = (const char*)context->custom;
+
+		switch (msg->Level)
+		{
+			case WLOG_INFO:
+				spdlog::info("[{}] {}", session_id, msg->TextString);
+				break;
+			case WLOG_ERROR:
+				spdlog::warn("[{}] {}", session_id, msg->TextString);
+				break;
+			case WLOG_DEBUG:
+				spdlog::debug("[{}] {}", session_id, msg->TextString);
+				break;
+			case WLOG_WARN:
+				spdlog::warn("[{}] {}", session_id, msg->TextString);
+				break;
+			default:
+				return TRUE;
+		}
 	}
 
 	return TRUE;

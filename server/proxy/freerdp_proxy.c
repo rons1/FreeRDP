@@ -83,9 +83,23 @@ static BOOL is_all_required_modules_loaded(proxyConfig* config)
 	return TRUE;
 }
 
-BOOL CallbackAppenderMessage(const wLogMessage* msg, void* context)
+static BOOL CallbackAppenderMessage(const wLogMessage* msg, void* context)
 {
 	return pf_modules_run_filter(FILTER_TYPE_LOG, context, msg);
+}
+
+static BOOL logger_init()
+{
+	wLogCallbacks callbacks;
+	WLog_SetLogAppenderType(WLog_GetRoot(), WLOG_APPENDER_CALLBACK);
+
+	wLogAppender* appender = WLog_GetLogAppender(WLog_GetRoot());
+
+	callbacks.message_ex = CallbackAppenderMessage;
+	if (!WLog_ConfigureAppender(appender, "callbacks", (void*)&callbacks))
+		return FALSE;
+
+	return TRUE;
 }
 
 int main(int argc, char* argv[])
@@ -94,19 +108,12 @@ int main(int argc, char* argv[])
 	char* config_path = "config.ini";
 	int status = -1;
 
-	WLog_INFO(TAG, "freerdp-proxy version info:");
-	WLog_INFO(TAG, "\tFreeRDP version: %s", FREERDP_VERSION_FULL);
-	WLog_INFO(TAG, "\tGit commit: %s", GIT_REVISION);
-	WLog_DBG(TAG, "\tBuild config: %s", freerdp_get_build_config());
-
 	if (argc >= 2)
 		config_path = argv[1];
 
 	config = pf_server_config_load(config_path);
 	if (!config)
 		goto fail;
-
-	pf_server_config_print(config);
 
 	if (!pf_modules_init(FREERDP_PROXY_PLUGINDIR, (const char**)config->Modules,
 	                     config->ModulesCount))
@@ -119,16 +126,13 @@ int main(int argc, char* argv[])
 	if (!is_all_required_modules_loaded(config))
 		goto fail;
 
-	wLogCallbacks callbacks;
+	logger_init();
 
-	WLog_SetLogAppenderType(WLog_GetRoot(), WLOG_APPENDER_CALLBACK);
-
-	wLogAppender* appender = WLog_GetLogAppender(WLog_GetRoot());
-
-	callbacks.message_ex = CallbackAppenderMessage;
-
-	if (!WLog_ConfigureAppender(appender, "callbacks", (void*)&callbacks))
-		return -1;
+	WLog_INFO(TAG, "freerdp-proxy version info:");
+	WLog_INFO(TAG, "\tFreeRDP version: %s", FREERDP_VERSION_FULL);
+	WLog_INFO(TAG, "\tGit commit: %s", GIT_REVISION);
+	WLog_DBG(TAG, "\tBuild config: %s", freerdp_get_build_config());
+	pf_server_config_print(config);
 
 	pf_server_register_signal_handlers();
 
