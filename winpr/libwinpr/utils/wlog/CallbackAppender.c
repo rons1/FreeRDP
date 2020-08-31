@@ -55,8 +55,13 @@ static BOOL WLog_CallbackAppender_WriteMessage(wLog* log, wLogAppender* appender
 
 	callbackAppender = (wLogCallbackAppender*)appender;
 
-	if (callbackAppender->callbacks && callbackAppender->callbacks->message)
-		return callbackAppender->callbacks->message(message);
+	if (callbackAppender->callbacks)
+	{
+		if (callbackAppender->callbacks->message_ex)
+			return callbackAppender->callbacks->message_ex(message, log->Context);
+		else if (callbackAppender->callbacks->message)
+			return callbackAppender->callbacks->message(message);
+	}
 	else
 		return FALSE;
 }

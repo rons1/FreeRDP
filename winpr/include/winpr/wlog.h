@@ -116,8 +116,6 @@ extern "C"
 	WINPR_API wLog* WLog_Get(LPCSTR name);
 	WINPR_API BOOL WLog_SetContext(wLog* log, const void* context);
 	WINPR_API const void* WLog_GetContext(wLog* log);
-	WINPR_API BOOL WLog_SetContextFormatter(wLog* log, wlog_context_formatter);
-	WINPR_API wlog_context_formatter WLog_GetContextFormatter(wLog* log);
 
 	WINPR_API DWORD WLog_GetLogLevel(wLog* log);
 	WINPR_API BOOL WLog_IsLevelActive(wLog* _log, DWORD _log_level);
@@ -132,14 +130,14 @@ extern "C"
 		}                                                                              \
 	} while (0)
 
-#define WLog_Print_tag(_tag, _log_level, ...)                                            \
-	do                                                                                   \
-	{                                                                                    \
-		static wLog* _log_cached_ptr = NULL;                                             \
-		if (!_log_cached_ptr)                                                            \
-			_log_cached_ptr = WLog_Get(_tag);                                            \
-		WLog_Print(_log_cached_ptr, WLOG_WARN, "Macro deprecated, upgrade to WLogEx_*"); \
-		WLog_Print(_log_cached_ptr, _log_level, __VA_ARGS__);                            \
+#define WLog_Print_tag(_tag, _log_level, ...)                 \
+	do                                                        \
+	{                                                         \
+		static wLog* _log_cached_ptr = NULL;                  \
+		if (!_log_cached_ptr)                                 \
+			_log_cached_ptr = WLog_Get(_tag);                 \
+		WLog_SetContext(_log_cached_ptr, NULL);               \
+		WLog_Print(_log_cached_ptr, _log_level, __VA_ARGS__); \
 	} while (0)
 
 #define WLogEx_Print_tag(_tag, context, _log_level, ...)      \
@@ -227,6 +225,7 @@ extern "C"
 	WINPR_API WINPR_DEPRECATED(BOOL WLog_Uninit(void));
 
 	typedef BOOL (*wLogCallbackMessage_t)(const wLogMessage* msg);
+	typedef BOOL (*wLogCallbackMessageEx_t)(const wLogMessage* msg, void* context);
 	typedef BOOL (*wLogCallbackData_t)(const wLogMessage* msg);
 	typedef BOOL (*wLogCallbackImage_t)(const wLogMessage* msg);
 	typedef BOOL (*wLogCallbackPackage_t)(const wLogMessage* msg);
@@ -237,6 +236,7 @@ extern "C"
 		wLogCallbackImage_t image;
 		wLogCallbackMessage_t message;
 		wLogCallbackPackage_t package;
+		wLogCallbackMessageEx_t message_ex;
 	};
 	typedef struct _wLogCallbacks wLogCallbacks;
 

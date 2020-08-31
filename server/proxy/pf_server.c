@@ -64,7 +64,7 @@ static BOOL pf_server_parse_target_from_routing_token(rdpContext* context, char*
 
 	if ((routing_token_length <= prefix_len) || (routing_token_length >= TARGET_MAX))
 	{
-		LOG_ERR(TAG, ps, "invalid routing token length: %" PRIu32 "", routing_token_length);
+		WLogEx_ERR(TAG, ps, "invalid routing token length: %" PRIu32 "", routing_token_length);
 		return FALSE;
 	}
 
@@ -101,8 +101,8 @@ static BOOL pf_server_get_target_info(rdpContext* context, rdpSettings* settings
 {
 	pServerContext* ps = (pServerContext*)context;
 
-	LOG_INFO(TAG, ps, "fetching target from %s",
-	         config->UseLoadBalanceInfo ? "load-balance-info" : "config");
+	WLogEx_INFO(TAG, context, "fetching target from %s",
+	            config->UseLoadBalanceInfo ? "load-balance-info" : "config");
 
 	if (config->UseLoadBalanceInfo)
 		return pf_server_parse_target_from_routing_token(context, &settings->ServerHostname,
@@ -111,7 +111,7 @@ static BOOL pf_server_get_target_info(rdpContext* context, rdpSettings* settings
 	/* use hardcoded target info from configuration */
 	if (!(settings->ServerHostname = _strdup(config->TargetHost)))
 	{
-		LOG_ERR(TAG, ps, "strdup failed!");
+		WLogEx_ERR(TAG, context, ps, "strdup failed!");
 		return FALSE;
 	}
 
@@ -139,7 +139,7 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	pc = pf_context_create_client_context(peer->settings);
 	if (pc == NULL)
 	{
-		LOG_ERR(TAG, ps, "failed to create client context!");
+		WLogEx_ERR(TAG, ps, "failed to create client context!");
 		return FALSE;
 	}
 
@@ -150,16 +150,16 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 
 	if (!pf_server_get_target_info(peer->context, client_settings, pdata->config))
 	{
-		LOG_INFO(TAG, ps, "pf_server_get_target_info failed!");
+		WLogEx_INFO(TAG, ps, "pf_server_get_target_info failed!");
 		return FALSE;
 	}
 
-	LOG_INFO(TAG, ps, "remote target is %s:%" PRIu16 "", client_settings->ServerHostname,
-	         client_settings->ServerPort);
+	WLogEx_INFO(TAG, ps, "remote target is %s:%" PRIu16 "", client_settings->ServerHostname,
+	            client_settings->ServerPort);
 
 	if (!pf_server_channels_init(ps))
 	{
-		LOG_INFO(TAG, ps, "failed to initialize server's channels!");
+		WLogEx_INFO(TAG, ps, "failed to initialize server's channels!");
 		return FALSE;
 	}
 
@@ -169,7 +169,7 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	/* Start a proxy's client in it's own thread */
 	if (!(pdata->client_thread = CreateThread(NULL, 0, pf_client_start, pc, 0, NULL)))
 	{
-		LOG_ERR(TAG, ps, "failed to create client thread");
+		WLogEx_ERR(TAG, ps, "failed to create client thread");
 		return FALSE;
 	}
 
@@ -333,8 +333,8 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 	pdata = ps->pdata;
 
 	client->Initialize(client);
-	LOG_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s", pdata->config->Host,
-	         client->hostname);
+	WLog_Print(pdata->log, WLOG_INFO, "new connection: proxy address: %s, client address: %s",
+	           pdata->config->Host, client->hostname);
 	/* Main client event handling loop */
 	ChannelEvent = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
 
@@ -370,7 +370,8 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 		{
 			if (!WTSVirtualChannelManagerCheckFileDescriptor(ps->vcm))
 			{
-				WLog_ERR(TAG, "WTSVirtualChannelManagerCheckFileDescriptor failure");
+				WLogEx_ERR(TAG, client->context,
+				           "WTSVirtualChannelManagerCheckFileDescriptor failure");
 				goto fail;
 			}
 		}
@@ -378,7 +379,8 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 		/* only disconnect after checking client's and vcm's file descriptors  */
 		if (proxy_data_shall_disconnect(pdata))
 		{
-			WLog_INFO(TAG, "abort event is set, closing connection with peer %s", client->hostname);
+			WLogEx_INFO(TAG, client->context, "abort event is set, closing connection with peer %s",
+			            client->hostname);
 			break;
 		}
 
@@ -390,7 +392,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 				/* Initialize drdynvc channel */
 				if (!WTSVirtualChannelManagerCheckFileDescriptor(ps->vcm))
 				{
-					WLog_ERR(TAG, "Failed to initialize drdynvc channel");
+					WLogEx_ERR(TAG, client->context, "Failed to initialize drdynvc channel");
 					goto fail;
 				}
 
@@ -412,13 +414,13 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 fail:
 
 	pc = (rdpContext*)pdata->pc;
-	LOG_INFO(TAG, ps, "starting shutdown of connection");
-	LOG_INFO(TAG, ps, "stopping proxy's client");
+	WLogEx_INFO(TAG, pc, "starting shutdown of connection");
+	WLogEx_INFO(TAG, pc, "stopping proxy's client");
 	freerdp_client_stop(pc);
 	pf_modules_run_hook(HOOK_TYPE_SERVER_SESSION_END, pdata);
-	LOG_INFO(TAG, ps, "freeing server's channels");
+	WLogEx_INFO(TAG, pc, "freeing server's channels");
 	pf_server_channels_free(ps);
-	LOG_INFO(TAG, ps, "freeing proxy data");
+	WLogEx_INFO(TAG, pc, "freeing proxy data");
 	ArrayList_Remove(server->clients, pdata);
 	proxy_data_free(pdata);
 	freerdp_client_context_free(pc);

@@ -187,8 +187,8 @@ static BOOL pf_client_save_session_info(rdpContext* context, UINT32 type, void* 
 		case INFO_TYPE_LOGON_LONG:
 		{
 			logonInfo = (logon_info*)data;
-			LOG_INFO(TAG, pc, "client logon info: Username: %s, Domain: %s", logonInfo->username,
-			         logonInfo->domain);
+			WLogEx_INFO(TAG, pc, "client logon info: Username: %s, Domain: %s", logonInfo->username,
+			            logonInfo->domain);
 			break;
 		}
 

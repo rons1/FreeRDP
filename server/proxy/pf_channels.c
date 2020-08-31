@@ -46,16 +46,16 @@
 
 static void pf_channels_wait_for_server_dynvc(pServerContext* ps)
 {
-	WLog_DBG(TAG, "pf_channels_wait_for_server_dynvc(): waiting for server's drdynvc to be ready");
+	WLogEx_DBG(TAG, ps, "waiting for server's drdynvc to be ready");
 	WaitForSingleObject(ps->dynvcReady, INFINITE);
-	WLog_DBG(TAG, "pf_channels_wait_for_server_dynvc(): server's drdynvc is ready!");
+	WLogEx_DBG(TAG, ps, "server's drdynvc is ready!");
 }
 
-void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs* e)
+void pf_channels_on_client_channel_connect(void* context, ChannelConnectedEventArgs* e)
 {
-	pClientContext* pc = (pClientContext*)data;
+	pClientContext* pc = (pClientContext*)context;
 	pServerContext* ps = pc->pdata->ps;
-	LOG_INFO(TAG, pc, "Channel connected: %s", e->name);
+	WLogEx_INFO(TAG, context, "Channel connected: %s", e->name);
 
 	if (strcmp(e->name, RDPEI_DVC_CHANNEL_NAME) == 0)
 	{
@@ -67,7 +67,7 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 
 		if (ps->rail->Start(ps->rail) != CHANNEL_RC_OK)
 		{
-			WLog_ERR(TAG, "failed to start RAIL server");
+			WLogEx_ERR(TAG, context, "failed to start RAIL server");
 			return;
 		}
 
@@ -81,7 +81,7 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 
 		if (!ps->gfx->Open(ps->gfx))
 		{
-			WLog_ERR(TAG, "failed to open GFX server");
+			WLogEx_ERR(TAG, context, "failed to open GFX server");
 			return;
 		}
 
@@ -105,7 +105,7 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 			pf_channels_wait_for_server_dynvc(ps);
 			if (ps->disp->Open(ps->disp) != CHANNEL_RC_OK)
 			{
-				WLog_ERR(TAG, "failed to open disp channel");
+				WLogEx_ERR(TAG, context, "failed to open disp channel");
 				return;
 			}
 		}
@@ -117,7 +117,7 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 	{
 		if (ps->cliprdr->Start(ps->cliprdr) != CHANNEL_RC_OK)
 		{
-			WLog_ERR(TAG, "failed to open cliprdr channel");
+			WLogEx_ERR(TAG, context, "failed to open cliprdr channel");
 			return;
 		}
 
@@ -132,7 +132,7 @@ void pf_channels_on_client_channel_connect(void* data, ChannelConnectedEventArgs
 
 		if (ps->rdpsnd->Initialize(ps->rdpsnd, TRUE) != CHANNEL_RC_OK)
 		{
-			WLog_ERR(TAG, "failed to open rdpsnd channel");
+			WLogEx_ERR(TAG, context, "failed to open rdpsnd channel");
 			return;
 		}
 	}
@@ -143,7 +143,7 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	rdpContext* context = (rdpContext*)data;
 	pClientContext* pc = (pClientContext*)context;
 	pServerContext* ps = pc->pdata->ps;
-	LOG_INFO(TAG, pc, "Channel disconnected: %s", e->name);
+	WLogEx_INFO(TAG, pc, "Channel disconnected: %s", e->name);
 
 	if (strcmp(e->name, RDPEI_DVC_CHANNEL_NAME) == 0)
 	{
@@ -152,7 +152,7 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	else if (strcmp(e->name, RDPGFX_DVC_CHANNEL_NAME) == 0)
 	{
 		if (!ps->gfx->Close(ps->gfx))
-			WLog_ERR(TAG, "failed to close gfx server");
+			WLogEx_ERR(TAG, context, "failed to close gfx server");
 
 		gdi_graphics_pipeline_uninit(context->gdi, pc->gfx_decoder);
 		rdpgfx_client_context_free(pc->gfx_decoder);
@@ -160,21 +160,21 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 	else if (strcmp(e->name, RAIL_SVC_CHANNEL_NAME) == 0)
 	{
 		if (!ps->rail->Stop(ps->rail))
-			WLog_ERR(TAG, "failed to close rail server");
+			WLogEx_ERR(TAG, context, "failed to close rail server");
 
 		pc->rail = NULL;
 	}
 	else if (strcmp(e->name, DISP_DVC_CHANNEL_NAME) == 0)
 	{
 		if (ps->disp->Close(ps->disp) != CHANNEL_RC_OK)
-			WLog_ERR(TAG, "failed to close disp server");
+			WLogEx_ERR(TAG, context, "failed to close disp server");
 
 		pc->disp = NULL;
 	}
 	else if (strcmp(e->name, CLIPRDR_SVC_CHANNEL_NAME) == 0)
 	{
 		if (ps->cliprdr->Stop(ps->cliprdr) != CHANNEL_RC_OK)
-			WLog_ERR(TAG, "failed to stop cliprdr server");
+			WLogEx_ERR(TAG, context, "failed to stop cliprdr server");
 
 		pc->cliprdr = NULL;
 	}
@@ -185,7 +185,7 @@ void pf_channels_on_client_channel_disconnect(void* data, ChannelDisconnectedEve
 			return;
 
 		if (ps->rdpsnd->Stop(ps->rdpsnd) != CHANNEL_RC_OK)
-			WLog_ERR(TAG, "failed to close rdpsnd server");
+			WLogEx_ERR(TAG, context, "failed to close rdpsnd server");
 	}
 }
 
@@ -245,8 +245,8 @@ BOOL pf_server_channels_init(pServerContext* ps)
 			ps->vc_handles[i] = WTSVirtualChannelOpen(ps->vcm, WTS_CURRENT_SESSION, channel_name);
 			if (!ps->vc_handles[i])
 			{
-				LOG_ERR(TAG, ps, "WTSVirtualChannelOpen failed for passthrough channel: %s",
-				        channel_name);
+				WLogEx_ERR(TAG, ps, "WTSVirtualChannelOpen failed for passthrough channel: %s",
+				           channel_name);
 
 				return FALSE;
 			}

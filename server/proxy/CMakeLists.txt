@@ -56,6 +56,8 @@ set(${MODULE_PREFIX}_SRCS
   pf_log.h
   )
 
+find_package(spdlog REQUIRED)
+
 # On windows create dll version information.
 # Vendor, product and year are already set in top level CMakeLists.txt
 if (WIN32)
@@ -78,6 +80,7 @@ set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} freerdp-server)
 set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} freerdp-client)
 set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} rdpgfx-client)
 set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} winpr freerdp)
+set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} spdlog::spdlog)
 
 target_link_libraries(${MODULE_NAME} ${${MODULE_PREFIX}_LIBS})
 install(TARGETS ${MODULE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT server)

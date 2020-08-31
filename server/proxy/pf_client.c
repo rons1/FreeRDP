@@ -64,8 +64,8 @@ static void pf_client_on_error_info(void* ctx, ErrorInfoEventArgs* e)
 	if (e->code == ERRINFO_NONE)
 		return;
 
-	LOG_WARN(TAG, pc, "received ErrorInfo PDU. code=0x%08" PRIu32 ", message: %s", e->code,
-	         freerdp_get_error_info_string(e->code));
+	WLogEx_WARN(TAG, ctx, "received ErrorInfo PDU. code=0x%08" PRIu32 ", message: %s", e->code,
+	            freerdp_get_error_info_string(e->code));
 
 	/* forward error back to client */
 	freerdp_set_error_info(ps->context.rdp, e->code);
@@ -78,7 +78,7 @@ static void pf_client_on_activated(void* ctx, ActivatedEventArgs* e)
 	pServerContext* ps = pc->pdata->ps;
 	freerdp_peer* peer = ps->context.peer;
 
-	LOG_INFO(TAG, pc, "client activated, registering server input callbacks");
+	WLogEx_INFO(TAG, ctx, "client activated, registering server input callbacks");
 
 	/* Register server input/update callbacks only after proxy client is fully activated */
 	pf_server_register_input_callbacks(peer->input);
@@ -121,7 +121,7 @@ static BOOL pf_client_passthrough_channels_init(pClientContext* pc)
 
 	if (settings->ChannelCount + config->PassthroughCount >= settings->ChannelDefArraySize)
 	{
-		LOG_ERR(TAG, pc, "too many channels");
+		WLogEx_ERR(TAG, pc, "too many channels");
 		return FALSE;
 	}
 
@@ -133,8 +133,8 @@ static BOOL pf_client_passthrough_channels_init(pClientContext* pc)
 		/* only connect connect this channel if already joined in peer connection */
 		if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
 		{
-			LOG_INFO(TAG, ps, "client did not connected with channel %s, skipping passthrough",
-			         channel_name);
+			WLogEx_WARN(TAG, ps, "client did not connected with channel %s, skipping passthrough",
+			            channel_name);
 
 			continue;
 		}
@@ -215,7 +215,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	 * Load all required plugins / channels / libraries specified by current
 	 * settings.
 	 */
-	LOG_INFO(TAG, pc, "Loading addins");
+	WLogEx_INFO(TAG, pc, "Loading addins");
 
 	if (!config->UseLoadBalanceInfo)
 	{
@@ -232,13 +232,13 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 
 	if (!pf_client_load_rdpsnd(pc))
 	{
-		LOG_ERR(TAG, pc, "Failed to load rdpsnd client");
+		WLogEx_ERR(TAG, pc, "Failed to load rdpsnd client");
 		return FALSE;
 	}
 
 	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
 	{
-		LOG_ERR(TAG, pc, "Failed to load addins");
+		WLogEx_ERR(TAG, pc, "Failed to load addins");
 		return FALSE;
 	}
 
@@ -326,7 +326,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	{
 		if (!pf_register_graphics(context->graphics))
 		{
-			LOG_ERR(TAG, pc, "failed to register graphics");
+			WLogEx_ERR(TAG, pc, "failed to register graphics");
 			return FALSE;
 		}
 
@@ -449,8 +449,8 @@ static BOOL pf_client_connect(freerdp* instance)
 	BOOL rc = FALSE;
 	BOOL retry = FALSE;
 
-	LOG_INFO(TAG, pc, "connecting using client info: Username: %s, Domain: %s", settings->Username,
-	         settings->Domain);
+	WLogEx_INFO(TAG, pc, "connecting using client info: Username: %s, Domain: %s",
+	            settings->Username, settings->Domain);
 
 	pf_client_set_security_settings(pc);
 	if (pf_client_should_retry_without_nla(pc))
@@ -461,12 +461,12 @@ static BOOL pf_client_connect(freerdp* instance)
 		if (!retry)
 			goto out;
 
-		LOG_ERR(TAG, pc, "failed to connect with NLA. retrying to connect without NLA");
+		WLogEx_ERR(TAG, pc, "failed to connect with NLA. retrying to connect without NLA");
 		pf_modules_run_hook(HOOK_TYPE_CLIENT_LOGIN_FAILURE, pc->pdata);
 
 		if (!pf_client_connect_without_nla(pc))
 		{
-			LOG_ERR(TAG, pc, "pf_client_connect_without_nla failed!");
+			WLogEx_ERR(TAG, pc, "pf_client_connect_without_nla failed!");
 			goto out;
 		}
 	}
@@ -518,7 +518,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 
 		if (nCount == 0)
 		{
-			LOG_ERR(TAG, pc, "freerdp_get_event_handles failed!");
+			WLogEx_ERR(TAG, pc, "freerdp_get_event_handles failed!");
 			break;
 		}
 
@@ -526,8 +526,8 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 
 		if (status == WAIT_FAILED)
 		{
-			WLog_ERR(TAG, "%s: WaitForMultipleObjects failed with %" PRIu32 "", __FUNCTION__,
-			         status);
+			WLogEx_ERR(TAG, pc, "%s: WaitForMultipleObjects failed with %" PRIu32 "", __FUNCTION__,
+			           status);
 			break;
 		}
 
@@ -540,7 +540,7 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 		if (!freerdp_check_event_handles(instance->context))
 		{
 			if (freerdp_get_last_error(instance->context) == FREERDP_ERROR_SUCCESS)
-				WLog_ERR(TAG, "Failed to check FreeRDP event handles");
+				WLogEx_ERR(TAG, pc, "Failed to check FreeRDP event handles");
 
 			break;
 		}
@@ -558,7 +558,7 @@ static int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 	if (!instance || !instance->context)
 		return -1;
 
-	WLog_INFO(TAG, "Logon Error Info %s [%s]", str_data, str_type);
+	WLogEx_INFO(TAG, instance->context, "Logon Error Info %s [%s]", str_data, str_type);
 	return 1;
 }
 
@@ -646,7 +646,7 @@ static int pf_client_client_stop(rdpContext* context)
 	pClientContext* pc = (pClientContext*)context;
 	proxyData* pdata = pc->pdata;
 
-	LOG_DBG(TAG, pc, "aborting client connection");
+	WLogEx_DBG(TAG, context, "aborting client connection");
 	proxy_data_abort_connect(pdata);
 	freerdp_abort_connect(context->instance);
 
@@ -656,9 +656,9 @@ static int pf_client_client_stop(rdpContext* context)
 		 * Wait for client thread to finish. No need to call CloseHandle() here, as
 		 * it is the responsibility of `proxy_data_free`.
 		 */
-		LOG_DBG(TAG, pc, "waiting for client thread to finish");
+		WLogEx_DBG(TAG, context, "waiting for client thread to finish");
 		WaitForSingleObject(pdata->client_thread, INFINITE);
-		LOG_DBG(TAG, pc, "thread finished");
+		WLogEx_DBG(TAG, context, "thread finished");
 	}
 
 	return 0;

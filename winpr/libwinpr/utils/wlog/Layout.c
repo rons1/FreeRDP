@@ -82,18 +82,7 @@ BOOL WLog_Layout_GetMessagePrefix(wLog* log, wLogLayout* layout, wLogMessage* me
 
 			if (*p)
 			{
-				if ((p[0] == 'c') && (p[1] == 'x')) /* log context */
-				{
-					wlog_context_formatter formatter = WLog_GetContextFormatter(log);
-					if (formatter)
-						args[argc++] = formatter(log);
-					else
-						args[argc++] = "NO LOG CONTEXT, use WLog_SetLogFormatter!";
-					format[index++] = '%';
-					format[index++] = 's';
-					p++;
-				}
-				else if ((p[0] == 'l') && (p[1] == 'v')) /* log level */
+				if ((p[0] == 'l') && (p[1] == 'v')) /* log level */
 				{
 					args[argc++] = (void*)WLOG_LEVELS[message->Level];
 					format[index++] = '%';
@@ -397,7 +386,7 @@ wLogLayout* WLog_Layout_New(wLog* log)
 #ifdef ANDROID
 		layout->FormatString = _strdup("[pid=%pid:tid=%tid] - ");
 #else
-		layout->FormatString = _strdup("[%hr:%mi:%se:%ml] [%cx] [%fn] [%pid:%tid] [%lv][%mn] - ");
+		layout->FormatString = _strdup("[%hr:%mi:%se:%ml] [%fn] [%pid:%tid] [%lv][%mn] - ");
 #endif
 
 		if (!layout->FormatString)
