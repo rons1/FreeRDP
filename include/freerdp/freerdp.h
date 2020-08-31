@@ -254,9 +254,10 @@ extern "C"
 		ALIGN64 rdpAutoDetect* autodetect; /* 43 */
 		ALIGN64 HANDLE abortEvent;         /* 44 */
 		ALIGN64 int disconnectUltimatum;   /* 45 */
-		UINT64 paddingC[64 - 46];          /* 46 */
+		ALIGN64 void* custom;              /* 46 */
+		UINT64 paddingC[65 - 47];          /* 47 */
 
-		UINT64 paddingD[96 - 64];  /* 64 */
+		UINT64 paddingD[96 - 65];  /* 65 */
 		UINT64 paddingE[128 - 96]; /* 96 */
 	};
 

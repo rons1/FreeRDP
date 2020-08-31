@@ -333,8 +333,8 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 	pdata = ps->pdata;
 
 	client->Initialize(client);
-	WLog_Print(pdata->log, WLOG_INFO, "new connection: proxy address: %s, client address: %s",
-	           pdata->config->Host, client->hostname);
+	WLogEx_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s",
+	            pdata->config->Host, client->hostname);
 	/* Main client event handling loop */
 	ChannelEvent = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
 

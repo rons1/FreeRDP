@@ -1796,6 +1796,8 @@ BOOL VCAPITYPE VirtualChannelEntryEx(PCHANNEL_ENTRY_POINTS_EX pEntryPoints, PVOI
 	}
 
 	drdynvc->log = WLog_Get(TAG);
+	WLog_SetContext(drdynvc->log, pEntryPointsEx->context);
+
 	WLog_Print(drdynvc->log, WLOG_DEBUG, "VirtualChannelEntryEx");
 	CopyMemory(&(drdynvc->channelEntryPoints), pEntryPoints,
 	           sizeof(CHANNEL_ENTRY_POINTS_FREERDP_EX));
