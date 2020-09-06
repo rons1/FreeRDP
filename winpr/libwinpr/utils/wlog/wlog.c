@@ -94,20 +94,6 @@ static void WLog_Uninit_(void)
 	g_RootLog = NULL;
 }
 
-static const char* wlog_pointer_context_formatter(wLog* log)
-{
-	if (!log || !log->Context)
-		return "NULL context, use WLog_SetContext to set a proper context";
-	if (!log->ContextString)
-	{
-		log->ContextString = calloc(1, 64);
-		if (!log->ContextString)
-			return "NULL, malloc failed for logger";
-		_snprintf(log->ContextString, 63, "[context=0x%08X] ", log->Context);
-	}
-	return log->ContextString;
-}
-
 static BOOL CALLBACK WLog_InitializeRoot(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context)
 {
 	char* env;

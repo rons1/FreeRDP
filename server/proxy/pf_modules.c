@@ -166,10 +166,6 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 				IFCALLRET(plugin->ServerChannelData, result, pdata, param);
 				break;
 
-			case FILTER_TYPE_LOG:
-				IFCALLRET(plugin->Log, result, pdata, param);
-				break;
-
 			default:
 				WLog_ERR(TAG, "invalid filter called");
 		}
@@ -187,6 +183,25 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
 	return TRUE;
 }
 
+BOOL pf_modules_log_external(const wLogMessage* msg, const char* session_id)
+{
+
+	BOOL result = TRUE;
+	int index;
+	proxyPlugin* plugin;
+
+	ArrayList_ForEach(plugins_list, proxyPlugin*, index, plugin)
+	{
+		IFCALLRET(plugin->Log, result, msg, session_id);
+	}
+
+	if (!result)
+		return FALSE;
+
+	/* all filters returned TRUE */
+	return TRUE;
+}
+
 /*
  * stores per-session data needed by a plugin.
  *
@@ -195,7 +210,8 @@ BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param)
  */
 static BOOL pf_modules_set_plugin_data(const char* plugin_name, proxyData* pdata, void* data)
 {
-	union {
+	union
+	{
 		const char* ccp;
 		char* cp;
 	} ccharconv;
@@ -224,7 +240,8 @@ static BOOL pf_modules_set_plugin_data(const char* plugin_name, proxyData* pdata
  */
 static void* pf_modules_get_plugin_data(const char* plugin_name, proxyData* pdata)
 {
-	union {
+	union
+	{
 		const char* ccp;
 		char* cp;
 	} ccharconv;

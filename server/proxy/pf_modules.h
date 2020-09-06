@@ -60,6 +60,7 @@ void pf_modules_list_loaded_plugins(void);
 
 BOOL pf_modules_run_filter(PF_FILTER_TYPE type, proxyData* pdata, void* param);
 BOOL pf_modules_run_hook(PF_HOOK_TYPE type, proxyData* pdata);
+BOOL pf_modules_log_external(const wLogMessage* msg, const char* session_id);
 
 void pf_modules_free(void);
 

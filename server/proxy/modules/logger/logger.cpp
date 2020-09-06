@@ -18,6 +18,8 @@
  */
 
 #include <iostream>
+#include <memory>
+#include <spdlog/spdlog.h>
 
 #include "modules_api.h"
 
@@ -28,10 +30,6 @@ static constexpr char plugin_desc[] = "this is a test plugin";
 
 static proxyPluginsManager* g_plugins_manager = NULL;
 
-#include <memory>
-
-#include <spdlog/spdlog.h>
-
 enum severity
 {
 	debug = 0,
@@ -40,12 +38,12 @@ enum severity
 	error = 3
 };
 
-static BOOL log_msg(proxyData* pdata, void* param)
+static BOOL log_msg(const wLogMessage* msg, const char* session_id)
 {
-	auto msg = static_cast<wLogMessage*>(param);
+	if (!msg)
+		return FALSE;
 
-	const rdpContext* context = (rdpContext*)pdata;
-	if (!context)
+	if (!session_id)
 	{
 		switch (msg->Level)
 		{
@@ -67,8 +65,6 @@ static BOOL log_msg(proxyData* pdata, void* param)
 	}
 	else
 	{
-		const char* session_id = (const char*)context->custom;
-
 		switch (msg->Level)
 		{
 			case WLOG_INFO:

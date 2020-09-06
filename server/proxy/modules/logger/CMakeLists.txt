@@ -23,7 +23,7 @@ add_library(${PLUGIN_NAME} MODULE
 	logger.cpp
 )
 
-find_library(BLACKHOLE_LIBRARY blackhole)
+find_package(spdlog REQUIRED)
 
 set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_STANDARD 14)
 set_target_properties(${PLUGIN_NAME} PROPERTIES PREFIX "")
@@ -31,4 +31,5 @@ set_target_properties(${PLUGIN_NAME} PROPERTIES NO_SONAME 1)
 set_target_properties(${PLUGIN_NAME} PROPERTIES
 LIBRARY_OUTPUT_DIRECTORY "${FREERDP_PROXY_PLUGINDIR}")
 
-target_link_libraries(${PLUGIN_NAME} ${BLACKHOLE_LIBRARY})
+target_link_libraries(${PLUGIN_NAME} PRIVATE spdlog::spdlog)
+
