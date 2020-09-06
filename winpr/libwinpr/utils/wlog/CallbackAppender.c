@@ -58,7 +58,14 @@ static BOOL WLog_CallbackAppender_WriteMessage(wLog* log, wLogAppender* appender
 	if (callbackAppender->callbacks)
 	{
 		if (callbackAppender->callbacks->message_ex)
-			return callbackAppender->callbacks->message_ex(message, log->Context);
+		{
+			BOOL rc;
+			EnterCriticalSection(&appender->lock);
+			rc = callbackAppender->callbacks->message_ex(message, log->Context);
+			LeaveCriticalSection(&appender->lock);
+
+			return rc;
+		}
 		else if (callbackAppender->callbacks->message)
 			return callbackAppender->callbacks->message(message);
 	}

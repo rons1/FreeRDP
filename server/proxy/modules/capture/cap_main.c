@@ -26,6 +26,7 @@
 #include <winpr/image.h>
 #include <freerdp/gdi/gdi.h>
 #include <winpr/winsock.h>
+#include <winpr/winpr.h>
 
 #include "pf_log.h"
 #include "modules_api.h"

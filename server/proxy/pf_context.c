@@ -243,7 +243,7 @@ error:
 /* updates circular pointers between proxyData and pClientContext instances */
 void proxy_data_set_client_context(proxyData* pdata, pClientContext* context)
 {
-	context->context.custom = pdata->session_id;
+	context->context.custom = _strdup(pdata->session_id);
 	pdata->pc = context;
 	context->pdata = pdata;
 }
@@ -251,7 +251,7 @@ void proxy_data_set_client_context(proxyData* pdata, pClientContext* context)
 /* updates circular pointers between proxyData and pServerContext instances */
 void proxy_data_set_server_context(proxyData* pdata, pServerContext* context)
 {
-	context->context.custom = pdata->session_id;
+	context->context.custom = _strdup(pdata->session_id);
 	pdata->ps = context;
 	context->pdata = pdata;
 }

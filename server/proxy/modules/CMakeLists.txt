@@ -18,6 +18,8 @@
 # automatically included by CMake when the -DWITH_THIRD_PARTY=on option is used.
 
 # include proxy header files for proxy modules
+message(${CMAKE_SOURCE_DIR})
+
 include_directories("${CMAKE_SOURCE_DIR}/server/proxy")
 include_directories("${CMAKE_SOURCE_DIR}/server/proxy/modules")
 

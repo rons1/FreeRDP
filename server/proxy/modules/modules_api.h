@@ -23,6 +23,7 @@
 
 #include <freerdp/freerdp.h>
 #include <winpr/winpr.h>
+#include <winpr/wlog.h>
 
 #include "../pf_context.h"
 
@@ -37,6 +38,7 @@ typedef BOOL (*proxyHookFn)(proxyData*);
  * 	or FALSE if it should be ignored.
  */
 typedef BOOL (*proxyFilterFn)(proxyData*, void*);
+typedef BOOL (*proxyLogFn)(const wLogMessage* message, const char* session_id);
 
 /* describes a plugin: name, description and callbacks to execute. */
 typedef struct proxy_plugin
@@ -61,7 +63,8 @@ typedef struct proxy_plugin
 	proxyFilterFn MouseEvent;
 	proxyFilterFn ClientChannelData; /* passthrough channels data */
 	proxyFilterFn ServerChannelData; /* passthrough channels data */
-	proxyFilterFn Log;               /* log */
+
+	proxyLogFn Log; /* log */
 } proxyPlugin;
 
 /*

@@ -85,7 +85,10 @@ static BOOL is_all_required_modules_loaded(proxyConfig* config)
 
 static BOOL CallbackAppenderMessage(const wLogMessage* msg, void* context)
 {
-	return pf_modules_run_filter(FILTER_TYPE_LOG, context, msg);
+	const rdpContext* rdp_context = (const rdpContext*)context;
+	const char* context_str = rdp_context == NULL ? NULL : rdp_context->custom;
+
+	return pf_modules_log_external(msg, context_str);
 }
 
 static BOOL logger_init()

@@ -1247,7 +1247,7 @@ rdpTransport* transport_new(rdpContext* context)
 	transport->io.ReadBytes = transport_read_layer;
 
 	if (!WLog_SetContext(transport->log, context))
-		goto out_free_transport;
+		goto fail;
 
 	transport->context = context;
 	transport->settings = context->settings;

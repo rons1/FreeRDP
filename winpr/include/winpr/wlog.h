@@ -148,6 +148,7 @@ extern "C"
 			_log_cached_ptr = WLog_Get(_tag);                 \
 		WLog_SetContext(_log_cached_ptr, context);            \
 		WLog_Print(_log_cached_ptr, _log_level, __VA_ARGS__); \
+		WLog_SetContext(_log_cached_ptr, NULL);               \
 	} while (0)
 
 #define WLog_PrintVA(_log, _log_level, _args)                                            \

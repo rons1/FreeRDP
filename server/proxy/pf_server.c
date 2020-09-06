@@ -319,7 +319,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 	DWORD status;
 	pServerContext* ps;
 	rdpContext* pc;
-	proxyData* pdata;
+	proxyData* pdata = NULL;
 	freerdp_peer* client = (freerdp_peer*)arg;
 	proxyServer* server = (proxyServer*)client->ContextExtra;
 
@@ -422,11 +422,11 @@ fail:
 	pf_server_channels_free(ps);
 	WLogEx_INFO(TAG, pc, "freeing proxy data");
 	ArrayList_Remove(server->clients, pdata);
-	proxy_data_free(pdata);
-	freerdp_client_context_free(pc);
 	client->Close(client);
 	client->Disconnect(client);
+	freerdp_client_context_free(pc);
 out_free_peer:
+	proxy_data_free(pdata);
 	freerdp_peer_context_free(client);
 	freerdp_peer_free(client);
 	CountdownEvent_Signal(server->waitGroup, 1);
