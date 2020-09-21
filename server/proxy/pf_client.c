@@ -85,42 +85,6 @@ static void pf_client_on_activated(void* ctx, ActivatedEventArgs* e)
 	pf_server_register_update_callbacks(peer->update);
 }
 
-static BOOL pf_client_passthrough_channels_init(pClientContext* pc)
-{
-	pServerContext* ps = pc->pdata->ps;
-	rdpSettings* settings = pc->context.settings;
-	proxyConfig* config = pc->pdata->config;
-	size_t i;
-
-	if (settings->ChannelCount + config->PassthroughCount >= settings->ChannelDefArraySize)
-	{
-		LOG_ERR(TAG, pc, "too many channels");
-		return FALSE;
-	}
-
-	for (i = 0; i < config->PassthroughCount; i++)
-	{
-		const char* channel_name = config->Passthrough[i];
-		CHANNEL_DEF channel = { 0 };
-
-		/* only connect connect this channel if already joined in peer connection */
-		if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
-		{
-			LOG_INFO(TAG, ps, "client did not connected with channel %s, skipping passthrough",
-			         channel_name);
-
-			continue;
-		}
-
-		channel.options = CHANNEL_OPTION_INITIALIZED; /* TODO: Export to config. */
-		strncpy(channel.name, channel_name, CHANNEL_NAME_LEN);
-
-		settings->ChannelDefArray[settings->ChannelCount++] = channel;
-	}
-
-	return TRUE;
-}
-
 static BOOL pf_client_use_peer_load_balance_info(pClientContext* pc)
 {
 	pServerContext* ps = pc->pdata->ps;
@@ -162,7 +126,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	settings->AudioPlayback = FALSE;
 
 	/* if proxying `drdynvc` as a passthrough channel, tell FreeRDP to not load `drdynvc` channel */
-	if (config->PassthroughDynamicChannels)
+	if (config->ProxyDrdynvc)
 	{
 		settings->AudioPlayback = config->AudioOutput;
 		settings->SupportDynamicChannels = FALSE;
@@ -200,7 +164,7 @@ static BOOL pf_client_pre_connect(freerdp* instance)
 	if (!pf_client_use_peer_load_balance_info(pc))
 		return FALSE;
 
-	if (!pf_client_passthrough_channels_init(pc))
+	if (!pf_channels_client_passthrough_channels_init(pc))
 		return FALSE;
 
 	if (!freerdp_client_load_addins(instance->context->channels, instance->settings))
@@ -221,28 +185,22 @@ static BOOL pf_client_receive_channel_data_hook(freerdp* instance, UINT16 channe
 	proxyData* pdata = ps->pdata;
 	proxyConfig* config = pdata->config;
 	size_t i;
-
 	const char* channel_name = freerdp_channels_get_name_by_id(instance, channelId);
+
+	/* see cmdline.c:3767 */
+	if (strcmp(channel_name, "drdynvc") == 0 && config->ProxyDrdynvc)
+	{
+		if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
+			return TRUE;
+	}
 
 	for (i = 0; i < config->PassthroughCount; i++)
 	{
 		if (strncmp(channel_name, config->Passthrough[i], CHANNEL_NAME_LEN) == 0)
 		{
-			proxyChannelDataEventInfo ev;
-			UINT64 server_channel_id;
 
-			ev.channel_id = channelId;
-			ev.channel_name = channel_name;
-			ev.data = data;
-			ev.data_len = size;
-
-			if (!pf_modules_run_filter(FILTER_TYPE_CLIENT_PASSTHROUGH_CHANNEL_DATA, pdata, &ev))
-				return FALSE;
-
-			server_channel_id = (UINT64)HashTable_GetItemValue(ps->vc_ids, (void*)channel_name);
-
-			return ps->context.peer->SendChannelData(ps->context.peer, (UINT16)server_channel_id,
-			                                         data, size);
+			return pf_channels_handle_passthrough_channel_data(
+			    pdata, FALSE, channelId, channel_name, data, size, flags, totalSize);
 		}
 	}
 
@@ -270,7 +228,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	rdpContext* context;
 	rdpSettings* settings;
 	rdpUpdate* update;
-	rdpContext* ps;
+	pServerContext* ps;
 	pClientContext* pc;
 	proxyConfig* config;
 
@@ -278,7 +236,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	settings = instance->settings;
 	update = instance->update;
 	pc = (pClientContext*)context;
-	ps = (rdpContext*)pc->pdata->ps;
+	ps = pc->pdata->ps;
 	config = pc->pdata->config;
 
 	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_POST_CONNECT, pc->pdata))
@@ -319,6 +277,10 @@ static BOOL pf_client_post_connect(freerdp* instance)
 		{
 			char* channel_name = config->Passthrough[i];
 			UINT64 channel_id = (UINT64)freerdp_channels_get_id_by_name(instance, channel_name);
+
+			if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
+				continue;
+
 			HashTable_Add(pc->vc_ids, (void*)channel_name, (void*)channel_id);
 		}
 	}
@@ -326,11 +288,11 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	instance->heartbeat->ServerHeartbeat = pf_client_on_server_heartbeat;
 
 	/*
-	 * after the connection fully established and settings were negotiated with target server,
-	 * send a reactivation sequence to the client with the negotiated settings. This way,
-	 * settings are synchorinized between proxy's peer and and remote target.
+	 * after the connection fully established and settings were negotiated with target
+	 * server, send a reactivation sequence to the client with the negotiated settings. This
+	 * way, settings are synchorinized between proxy's peer and and remote target.
 	 */
-	return proxy_server_reactivate(ps, context);
+	return proxy_server_reactivate(&ps->context, context);
 }
 
 /* This function is called whether a session ends by failure or success.
@@ -460,11 +422,11 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 	HANDLE handles[65];
 
 	/*
-	 * during redirection, freerdp's abort event might be overriden (reset) by the library, after
-	 * the server set it in order to shutdown the connection. it means that the server might signal
-	 * the client to abort, but the library code will override the signal and the client will
-	 * continue its work instead of exiting. That's why the client must wait on `pdata->abort_event`
-	 * too, which will never be modified by the library.
+	 * during redirection, freerdp's abort event might be overriden (reset) by the library,
+	 * after the server set it in order to shutdown the connection. it means that the server
+	 * might signal the client to abort, but the library code will override the signal and
+	 * the client will continue its work instead of exiting. That's why the client must wait
+	 * on `pdata->abort_event` too, which will never be modified by the library.
 	 */
 	handles[64] = pdata->abort_event;
 
@@ -502,13 +464,18 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 		if (freerdp_shall_disconnect(instance) || proxy_data_shall_disconnect(pdata))
 			break;
 
+		EnterCriticalSection(&pdata->lock);
+
 		if (!freerdp_check_event_handles(instance->context))
 		{
 			if (freerdp_get_last_error(instance->context) == FREERDP_ERROR_SUCCESS)
 				WLog_ERR(TAG, "Failed to check FreeRDP event handles");
 
+			LeaveCriticalSection(&pdata->lock);
 			break;
 		}
+
+		LeaveCriticalSection(&pdata->lock);
 	}
 
 	EnterCriticalSection(&pdata->lock);
@@ -533,22 +500,6 @@ static int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 	return 1;
 }
 
-/**
- * Callback set in the rdp_freerdp structure, and used to make a certificate validation
- * when the connection requires it.
- * This function will actually be called by tls_verify_certificate().
- * @see rdp_client_connect() and tls_connect()
- * @param instance     pointer to the rdp_freerdp structure that contains the connection settings
- * @param host         The host currently connecting to
- * @param port         The port currently connecting to
- * @param common_name  The common name of the certificate, should match host or an alias of it
- * @param subject      The subject of the certificate
- * @param issuer       The certificate issuer name
- * @param fingerprint  The fingerprint of the certificate
- * @param flags        See VERIFY_CERT_FLAG_* for possible values.
- *
- * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
- */
 static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host, UINT16 port,
                                              const char* common_name, const char* subject,
                                              const char* issuer, const char* fingerprint,
@@ -575,6 +526,7 @@ static void pf_client_context_free(freerdp* instance, rdpContext* context)
 		return;
 
 	HashTable_Free(pc->vc_ids);
+	HashTable_Free(pc->vc_data_in);
 }
 
 static BOOL pf_client_client_new(freerdp* instance, rdpContext* context)

@@ -38,6 +38,25 @@ static wHashTable* create_channel_ids_map()
 	return table;
 }
 
+static void stream_free(void* obj)
+{
+	if (obj)
+	{
+		wStream* s = (wStream*)obj;
+		Stream_Free(s, TRUE);
+	}
+}
+
+static wHashTable* create_channel_data_in_map()
+{
+	wHashTable* table = HashTable_New(FALSE);
+	if (!table)
+		return NULL;
+
+	table->valueFree = stream_free;
+	return table;
+}
+
 /* Proxy context initialization callback */
 static BOOL client_to_proxy_context_new(freerdp_peer* client, pServerContext* context)
 {
@@ -62,6 +81,10 @@ static BOOL client_to_proxy_context_new(freerdp_peer* client, pServerContext* co
 	if (!context->vc_ids)
 		goto error;
 
+	context->vc_data_in = create_channel_data_in_map();
+	if (!context->vc_data_in)
+		goto error;
+
 	return TRUE;
 
 error:
@@ -77,6 +100,7 @@ error:
 	free(context->vc_handles);
 	context->vc_handles = NULL;
 	HashTable_Free(context->vc_ids);
+	HashTable_Free(context->vc_data_in);
 	context->vc_ids = NULL;
 	return FALSE;
 }
@@ -102,6 +126,7 @@ static void client_to_proxy_context_free(freerdp_peer* client, pServerContext* c
 	}
 
 	HashTable_Free(context->vc_ids);
+	HashTable_Free(context->vc_data_in);
 	free(context->vc_handles);
 }
 
@@ -192,6 +217,10 @@ pClientContext* pf_context_create_client_context(rdpSettings* clientSettings)
 
 	pc->vc_ids = create_channel_ids_map();
 	if (!pc->vc_ids)
+		goto error;
+
+	pc->vc_data_in = create_channel_data_in_map();
+	if (!pc->vc_data_in)
 		goto error;
 
 	return pc;

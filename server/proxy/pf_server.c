@@ -240,21 +240,8 @@ static BOOL pf_server_receive_channel_data_hook(freerdp_peer* peer, UINT16 chann
 	{
 		if (strncmp(channel_name, config->Passthrough[i], CHANNEL_NAME_LEN) == 0)
 		{
-			proxyChannelDataEventInfo ev;
-			UINT64 client_channel_id;
-
-			ev.channel_id = channelId;
-			ev.channel_name = channel_name;
-			ev.data = data;
-			ev.data_len = size;
-
-			if (!pf_modules_run_filter(FILTER_TYPE_SERVER_PASSTHROUGH_CHANNEL_DATA, pdata, &ev))
-				return FALSE;
-
-			client_channel_id = (UINT64)HashTable_GetItemValue(pc->vc_ids, (void*)channel_name);
-
-			return pc->context.instance->SendChannelData(pc->context.instance,
-			                                             (UINT16)client_channel_id, data, size);
+			return pf_channels_handle_passthrough_channel_data(pdata, TRUE, channelId, channel_name,
+			                                                   data, size, flags, totalSize);
 		}
 	}
 
@@ -291,6 +278,7 @@ static BOOL pf_server_initialize_peer_connection(freerdp_peer* peer)
 	settings->CertificateFile = _strdup("server.crt");
 	settings->PrivateKeyFile = _strdup("server.key");
 	settings->RdpKeyFile = _strdup("server.key");
+	settings->AllowedTlsCiphers = _strdup("AES128-SHA");
 
 	if (config->RemoteApp)
 	{
@@ -345,15 +333,14 @@ static BOOL pf_server_check_wts_server_fds(pServerContext* ps, HANDLE channelEve
 
 	if (WaitForSingleObject(channelEvent, 0) == WAIT_OBJECT_0)
 	{
-		if (!WTSVirtualChannelManagerCheckFileDescriptorEx(ps->vcm,
-		                                                   !config->PassthroughDynamicChannels))
+		if (!WTSVirtualChannelManagerCheckFileDescriptorEx(ps->vcm, !config->ProxyDrdynvc))
 		{
 			WLog_ERR(TAG, "WTSVirtualChannelManagerCheckFileDescriptor failure");
 			return FALSE;
 		}
 	}
 
-	if (config->PassthroughDynamicChannels)
+	if (config->ProxyDrdynvc)
 		return TRUE;
 
 	switch (WTSVirtualChannelManagerGetDrdynvcState(ps->vcm))

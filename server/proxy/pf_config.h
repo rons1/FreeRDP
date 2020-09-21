@@ -32,7 +32,7 @@ struct proxy_config
 	/* server */
 	char* Host;
 	UINT16 Port;
-	BOOL PassthroughDynamicChannels;
+	BOOL ProxyDrdynvc;
 
 	/* target */
 	BOOL FixedTarget;

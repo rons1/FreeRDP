@@ -180,7 +180,7 @@ static BOOL pf_config_load_channels(wIniFile* ini, proxyConfig* config)
 		for (i = 0; i < config->PassthroughCount; i++)
 		{
 			if (strcmp(config->Passthrough[i], "drdynvc") == 0)
-				config->PassthroughDynamicChannels = TRUE;
+				config->ProxyDrdynvc = TRUE;
 
 			if (strlen(config->Passthrough[i]) > CHANNEL_NAME_LEN)
 			{
@@ -306,12 +306,8 @@ static void pf_server_config_print_list(char** list, size_t count)
 
 void pf_server_config_print(proxyConfig* config)
 {
-	BOOL proxyDrdynvcMode;
-
 	if (!config)
 		return;
-
-	proxyDrdynvcMode = config->PassthroughDynamicChannels;
 
 	WLog_INFO(TAG, "Proxy configuration:");
 
@@ -341,7 +337,7 @@ void pf_server_config_print(proxyConfig* config)
 	CONFIG_PRINT_BOOL(config, ClientAllowFallbackToTls);
 
 	CONFIG_PRINT_SECTION("Channels");
-	if (!proxyDrdynvcMode)
+	if (!config->ProxyDrdynvc)
 	{
 		CONFIG_PRINT_BOOL(config, GFX);
 		CONFIG_PRINT_BOOL(config, DisplayControl);
@@ -362,16 +358,15 @@ void pf_server_config_print(proxyConfig* config)
 	if (config->MaxTextLength > 0)
 		CONFIG_PRINT_UINT32(config, MaxTextLength);
 
-	if (!proxyDrdynvcMode)
+	if (!config->ProxyDrdynvc)
 	{
 		CONFIG_PRINT_SECTION("GFXSettings");
 		CONFIG_PRINT_BOOL(config, DecodeGFX);
 	}
 	else
 	{
-		WLog_INFO(TAG, "Proxy is in dynamic virtual channels proxy mode, meaning that every");
-		WLog_INFO(TAG, "dynamic virtual channel will be proxied, and the GFX capture module won't "
-		               "be available");
+		WLog_INFO(TAG, "'drdynvc' is configured to be proxied, meaning that every dynamic channel");
+		WLog_INFO(TAG, "will be proxied. GFX capture module is not supported in this mode.");
 	}
 }
 
