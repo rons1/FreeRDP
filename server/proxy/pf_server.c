@@ -171,6 +171,17 @@ static BOOL pf_server_post_connect(freerdp_peer* peer)
 	proxyData* pdata;
 	ps = (pServerContext*)peer->context;
 	pdata = ps->pdata;
+	char** accepted_channels;
+	size_t accepted_channels_count;
+	size_t i;
+
+	accepted_channels = WTSGetAcceptedChannelNames(peer, &accepted_channels_count);
+	for (i = 0; i < accepted_channels_count; i++)
+	{
+		LOG_INFO(TAG, ps, "Accepted channel: %s", accepted_channels[i]);
+		free(accepted_channels[i]);
+	}
+	free(accepted_channels);
 
 	pc = pf_context_create_client_context(peer->settings);
 	if (pc == NULL)
@@ -369,8 +380,8 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 	pdata = ps->pdata;
 
 	client->Initialize(client);
-	LOG_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s", pdata->config->Host,
-	         client->hostname);
+	LOG_INFO(TAG, ps, "new connection: proxy address: %s, client address: %s, client hostname: %s",
+	         pdata->config->Host, client->settings->ClientHostname);
 	/* Main client event handling loop */
 	ChannelEvent = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
 
