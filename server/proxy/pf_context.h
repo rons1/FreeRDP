@@ -59,8 +59,9 @@ struct p_server_context
 	CliprdrServerContext* cliprdr;
 	RdpsndServerContext* rdpsnd;
 
-	HANDLE* vc_handles; /* static virtual channels open handles */
-	wHashTable* vc_ids; /* channel_name -> channel_id map */
+	HANDLE* vc_handles;     /* static virtual channels open handles */
+	wHashTable* vc_ids;     /* channel_name -> channel_id map */
+	wHashTable* vc_data_in; /* channel_id -> data_in stream */
 };
 typedef struct p_server_context pServerContext;
 
@@ -91,7 +92,8 @@ struct p_client_context
 	 */
 	BOOL allow_next_conn_failure;
 
-	wHashTable* vc_ids; /* channel_name -> channel_id map */
+	wHashTable* vc_ids;     /* channel_name -> channel_id map */
+	wHashTable* vc_data_in; /* channel_id -> data_in stream */
 };
 typedef struct p_client_context pClientContext;
 
@@ -113,6 +115,9 @@ struct proxy_data
 
 	/* used to external modules to store per-session info */
 	wHashTable* modules_info;
+
+	/* used to ensure no server events will pop up while client is in disconnect state */
+	CRITICAL_SECTION lock;
 };
 
 BOOL pf_context_copy_settings(rdpSettings* dst, const rdpSettings* src);
