@@ -295,7 +295,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	rdpContext* context;
 	rdpSettings* settings;
 	rdpUpdate* update;
-	rdpContext* ps;
+	pServerContext* ps;
 	pClientContext* pc;
 	proxyConfig* config;
 
@@ -303,7 +303,7 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	settings = instance->settings;
 	update = instance->update;
 	pc = (pClientContext*)context;
-	ps = (rdpContext*)pc->pdata->ps;
+	ps = pc->pdata->ps;
 	config = pc->pdata->config;
 
 	if (!pf_modules_run_hook(HOOK_TYPE_CLIENT_POST_CONNECT, pc->pdata))
@@ -344,6 +344,10 @@ static BOOL pf_client_post_connect(freerdp* instance)
 		{
 			char* channel_name = config->Passthrough[i];
 			UINT64 channel_id = (UINT64)freerdp_channels_get_id_by_name(instance, channel_name);
+
+			if (!WTSVirtualChannelManagerIsChannelJoined(ps->vcm, channel_name))
+				continue;
+
 			HashTable_Add(pc->vc_ids, (void*)channel_name, (void*)channel_id);
 		}
 	}
@@ -351,11 +355,11 @@ static BOOL pf_client_post_connect(freerdp* instance)
 	instance->heartbeat->ServerHeartbeat = pf_client_on_server_heartbeat;
 
 	/*
-	 * after the connection fully established and settings were negotiated with target server,
-	 * send a reactivation sequence to the client with the negotiated settings. This way,
-	 * settings are synchorinized between proxy's peer and and remote target.
+	 * after the connection fully established and settings were negotiated with target
+	 * server, send a reactivation sequence to the client with the negotiated settings. This
+	 * way, settings are synchorinized between proxy's peer and and remote target.
 	 */
-	return proxy_server_reactivate(ps, context);
+	return proxy_server_reactivate(&ps->context, context);
 }
 
 /* This function is called whether a session ends by failure or success.
@@ -454,8 +458,12 @@ static BOOL pf_client_connect(freerdp* instance)
 
 	if (!freerdp_connect(instance))
 	{
+		UINT32 error = freerdp_get_last_error(instance->context);
+		LOG_ERR(TAG, pc, "freerdp_connect failed, error code: 0x%x [%s]", error, freerdp_get_last_error_name(error));
+
 		if (!retry)
 			goto out;
+
 
 		LOG_ERR(TAG, pc, "failed to connect with NLA. retrying to connect without NLA");
 		pf_modules_run_hook(HOOK_TYPE_CLIENT_LOGIN_FAILURE, pc->pdata);
@@ -488,11 +496,11 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 	HANDLE handles[65];
 
 	/*
-	 * during redirection, freerdp's abort event might be overriden (reset) by the library, after
-	 * the server set it in order to shutdown the connection. it means that the server might signal
-	 * the client to abort, but the library code will override the signal and the client will
-	 * continue its work instead of exiting. That's why the client must wait on `pdata->abort_event`
-	 * too, which will never be modified by the library.
+	 * during redirection, freerdp's abort event might be overriden (reset) by the library,
+	 * after the server set it in order to shutdown the connection. it means that the server
+	 * might signal the client to abort, but the library code will override the signal and
+	 * the client will continue its work instead of exiting. That's why the client must wait
+	 * on `pdata->abort_event` too, which will never be modified by the library.
 	 */
 	handles[64] = pdata->abort_event;
 
@@ -527,22 +535,29 @@ static DWORD WINAPI pf_client_thread_proc(LPVOID arg)
 			break;
 		}
 
-		if (freerdp_shall_disconnect(instance))
+		if (freerdp_shall_disconnect(instance) || proxy_data_shall_disconnect(pdata))
 			break;
 
-		if (proxy_data_shall_disconnect(pdata))
-			break;
-
+		EnterCriticalSection(&pdata->lock);
 		if (!freerdp_check_event_handles(instance->context))
 		{
 			if (freerdp_get_last_error(instance->context) == FREERDP_ERROR_SUCCESS)
 				WLog_ERR(TAG, "Failed to check FreeRDP event handles");
 
+			LeaveCriticalSection(&pdata->lock);
 			break;
 		}
+
+		LeaveCriticalSection(&pdata->lock);
 	}
 
+	EnterCriticalSection(&pdata->lock);
+
+	/* signal server main loop to stop*/
+	proxy_data_abort_connect(pdata);
 	freerdp_disconnect(instance);
+
+	LeaveCriticalSection(&pdata->lock);
 	return 0;
 }
 
@@ -558,22 +573,6 @@ static int pf_logon_error_info(freerdp* instance, UINT32 data, UINT32 type)
 	return 1;
 }
 
-/**
- * Callback set in the rdp_freerdp structure, and used to make a certificate validation
- * when the connection requires it.
- * This function will actually be called by tls_verify_certificate().
- * @see rdp_client_connect() and tls_connect()
- * @param instance     pointer to the rdp_freerdp structure that contains the connection settings
- * @param host         The host currently connecting to
- * @param port         The port currently connecting to
- * @param common_name  The common name of the certificate, should match host or an alias of it
- * @param subject      The subject of the certificate
- * @param issuer       The certificate issuer name
- * @param fingerprint  The fingerprint of the certificate
- * @param flags        See VERIFY_CERT_FLAG_* for possible values.
- *
- * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
- */
 static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host, UINT16 port,
                                              const char* common_name, const char* subject,
                                              const char* issuer, const char* fingerprint,
@@ -583,25 +582,6 @@ static DWORD pf_client_verify_certificate_ex(freerdp* instance, const char* host
 	return 1;
 }
 
-/**
- * Callback set in the rdp_freerdp structure, and used to make a certificate validation
- * when a stored certificate does not match the remote counterpart.
- * This function will actually be called by tls_verify_certificate().
- * @see rdp_client_connect() and tls_connect()
- * @param instance        pointer to the rdp_freerdp structure that contains the connection settings
- * @param host            The host currently connecting to
- * @param port            The port currently connecting to
- * @param common_name     The common name of the certificate, should match host or an alias of it
- * @param subject         The subject of the certificate
- * @param issuer          The certificate issuer name
- * @param fingerprint     The fingerprint of the certificate
- * @param old_subject     The subject of the previous certificate
- * @param old_issuer      The previous certificate issuer name
- * @param old_fingerprint The fingerprint of the previous certificate
- * @param flags           See VERIFY_CERT_FLAG_* for possible values.
- *
- * @return 1 if the certificate is trusted, 2 if temporary trusted, 0 otherwise.
- */
 static DWORD pf_client_verify_changed_certificate_ex(
     freerdp* instance, const char* host, UINT16 port, const char* common_name, const char* subject,
     const char* issuer, const char* fingerprint, const char* old_subject, const char* old_issuer,
@@ -673,14 +653,29 @@ int RdpClientEntry(RDP_CLIENT_ENTRY_POINTS* pEntryPoints)
 }
 
 /**
- * Starts running a client connection towards target server.
+ * Starts running a client connection towards target server, in a new thread.
+ * Thread handle is saved in `pdata->client_thread`.
  */
-DWORD WINAPI pf_client_start(LPVOID arg)
+BOOL pf_client_start(pClientContext* pc)
 {
-	rdpContext* context = (rdpContext*)arg;
+	rdpContext* context;
+	proxyData* pdata;
+
+	if (!pc)
+		return FALSE;
+
+	context = &pc->context;
+	pdata = pc->pdata;
 
 	if (freerdp_client_start(context) != 0)
-		return 1;
+		return FALSE;
 
-	return pf_client_thread_proc(context->instance);
+	pdata->client_thread = CreateThread(NULL, 0, pf_client_thread_proc, context->instance, 0, NULL);
+	if (!pdata->client_thread)
+	{
+		LOG_ERR(TAG, pc, "failed to create client thread");
+		return FALSE;
+	}
+
+	return TRUE;
 }
