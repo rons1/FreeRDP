@@ -49,7 +49,7 @@ typedef BOOL (*psReceivedFileContentsRequest)(pfClipboard* state,
                                               const CLIPRDR_FILE_CONTENTS_REQUEST* request);
 typedef BOOL (*psReceivedFileContentsResponse)(pfClipboard* state,
                                                const CLIPRDR_FILE_CONTENTS_RESPONSE* response);
-typedef BOOL (*psReceivedFileList)(pfClipboard* state, FILEDESCRIPTOR* descriptors, UINT count);
+typedef BOOL (*psReceivedFileList)(pfClipboard* state, FILEDESCRIPTORW* descriptors, UINT count);
 typedef BOOL (*psReceivedFormatList)(pfClipboard* state, const CLIPRDR_FORMAT_LIST* formatList);
 
 struct pf_clipboard
@@ -60,7 +60,7 @@ struct pf_clipboard
 	CliprdrClientContext* client;
 
 	UINT32 nstreams;
-	FILEDESCRIPTOR* descriptors;
+	FILEDESCRIPTORW* descriptors;
 	fileStream* streams;
 
 	UINT32 fileListFormatId;

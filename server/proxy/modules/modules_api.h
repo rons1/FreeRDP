@@ -38,8 +38,6 @@ typedef BOOL (*proxyHookFn)(proxyData*);
  */
 typedef BOOL (*proxyFilterFn)(proxyData*, void*);
 
-typedef struct kbd_event proxyKeyboardEventInfo;
-typedef struct mouse_event proxyMouseEventInfo;
 typedef struct file_metadata_event proxyPreFileCopyEventInfo;
 typedef struct file_data_event proxyFileCopyEventInfo;
 

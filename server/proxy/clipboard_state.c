@@ -26,7 +26,7 @@
 
 #define TAG PROXY_TAG("clipboard.state")
 
-static BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTOR* descriptors,
+static BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESCRIPTORW* descriptors,
                                                 UINT count)
 {
 	size_t i;
@@ -62,7 +62,7 @@ static BOOL pf_clipboard_state_update_file_list(pfClipboard* clipboard, FILEDESC
 	/* initialize streams */
 	for (i = 0; i < clipboard->nstreams; i++)
 	{
-		FILEDESCRIPTOR file = clipboard->descriptors[i];
+		FILEDESCRIPTORW file = clipboard->descriptors[i];
 		fileStream* stream = &clipboard->streams[i];
 
 		stream->m_lSize.u.LowPart = file.nFileSizeLow;

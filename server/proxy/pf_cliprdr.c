@@ -149,7 +149,7 @@ static UINT proxy_format_data_response(pfClipboard* clipboard,
 static BOOL clipboard_handle_file_list(pfClipboard* clipboard,
                                        const CLIPRDR_FORMAT_DATA_RESPONSE* response)
 {
-	FILEDESCRIPTOR* files;
+	FILEDESCRIPTORW* files;
 	UINT rc;
 	UINT32 files_count;
 	size_t index;
@@ -170,6 +170,7 @@ static BOOL clipboard_handle_file_list(pfClipboard* clipboard,
 		return FALSE;
 	}
 
+	
 	/* update state */
 	clipboard->OnReceivedFileList(clipboard, files, files_count);
 
@@ -179,13 +180,16 @@ static BOOL clipboard_handle_file_list(pfClipboard* clipboard,
 
 	for (index = 0; index < files_count; index++)
 	{
+		rdpContext* ctx = clipboard->server->rdpcontext;
+		pServerContext* ps = (pServerContext*)ctx;
+		proxyData* pdata = ps->pdata;
 		proxyPreFileCopyEventInfo event;
 
 		event.client_to_server = TRUE;
 		event.total_size = files[index].nFileSizeLow; // TODO: fix this
 
 		if (!pf_modules_run_filter(FILTER_TYPE_CLIPBOARD_FILE_METADATA,
-		                           (rdpContext*)clipboard->server->rdpcontext, &event))
+		                           pdata, &event))
 			return FALSE;
 
 		if (event.new_name != NULL)
@@ -509,14 +513,14 @@ clipboard_handle_filecontents_range_response(pfClipboard* clipboard,
 	}
 	else if (stream->m_lOffset.QuadPart == total_size)
 	{
-		rdpContext* ps = (rdpContext*)clipboard->server->custom;
+		pServerContext* ps = (pServerContext*)clipboard->server->custom;
 		proxyFileCopyEventInfo event = { 0 };
 		event.data = Stream_Buffer(stream->data);
 		event.data_len = total_size;
 		event.client_to_server = (clipboard->owner == CLIPBOARD_OWNER_SERVER);
 
 		WLog_INFO(TAG, "constructed file in memory: index=%" PRIu16 "", index);
-		stream->passed_filter = pf_modules_run_filter(FILTER_TYPE_CLIPBOARD_FILE_DATA, ps, &event);
+		stream->passed_filter = pf_modules_run_filter(FILTER_TYPE_CLIPBOARD_FILE_DATA, ps->pdata, &event);
 		if (stream->passed_filter && event.new_data != NULL)
 		{
 			/* file data was modified by filter */
@@ -615,7 +619,7 @@ static UINT clipboard_ServerFormatList(CliprdrClientContext* context,
 	if (pdata->config->TextOnly)
 	{
 		CLIPRDR_FORMAT_LIST list = { 0 };
-		pf_cliprdr_create_text_only_format_list(&list);
+		clipboard_create_text_only_format_list(&list);
 		return server->ServerFormatList(server, &list);
 	}
 

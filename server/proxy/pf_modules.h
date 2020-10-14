@@ -53,14 +53,7 @@ enum _PF_HOOK_TYPE
 	HOOK_TYPE_SERVER_POST_CONNECT,
 	HOOK_TYPE_SERVER_CHANNELS_INIT,
 	HOOK_TYPE_SERVER_SESSION_END,
-	HOOK_TYPE_SERVER_CHANNELS_FREE
-};
-
-struct proxy_module
-{
-	/* Handle to the loaded library. Used for freeing the library */
-	HMODULE handle;
-
+	HOOK_TYPE_SERVER_CHANNELS_FREE,
 	HOOK_LAST
 };
 
