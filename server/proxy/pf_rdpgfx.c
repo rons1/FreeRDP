@@ -342,8 +342,9 @@ static UINT pf_rdpgfx_map_surface_to_window(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->MapSurfaceToWindow(server, surfaceToWindow)))
-		return error;
+	RDPGFX_MAP_SURFACE_TO_WINDOW_PDU* copy = malloc(sizeof(RDPGFX_MAP_SURFACE_TO_WINDOW_PDU));
+	*copy = *surfaceToWindow;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_MAPSURFACETOWINDOW, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -362,8 +363,10 @@ static UINT pf_rdpgfx_map_surface_to_scaled_window(
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->MapSurfaceToScaledWindow(server, surfaceToScaledWindow)))
-		return error;
+	RDPGFX_MAP_SURFACE_TO_SCALED_WINDOW_PDU* copy =
+	    malloc(sizeof(RDPGFX_MAP_SURFACE_TO_SCALED_WINDOW_PDU));
+	*copy = *surfaceToScaledWindow;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_MAPSURFACETOSCALEDWINDOW, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -382,8 +385,10 @@ static UINT pf_rdpgfx_map_surface_to_scaled_output(
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->MapSurfaceToScaledOutput(server, surfaceToScaledOutput)))
-		return error;
+	RDPGFX_MAP_SURFACE_TO_SCALED_OUTPUT_PDU* copy =
+	    malloc(sizeof(RDPGFX_MAP_SURFACE_TO_SCALED_OUTPUT_PDU));
+	*copy = *surfaceToScaledOutput;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_MAPSURFACETOSCALEDOUTPUT, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;

@@ -539,6 +539,36 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 							goto fail;
 						break;
 					}
+					case RDPGFX_CMDID_MAPSURFACETOWINDOW:
+					{
+						RDPGFX_MAP_SURFACE_TO_WINDOW_PDU* surfaceToWindow =
+						    (RDPGFX_MAP_SURFACE_TO_WINDOW_PDU*)message.wParam;
+						if ((error = ps->gfx->MapSurfaceToWindow(ps->gfx, surfaceToWindow)))
+							goto fail;
+						break;
+					}
+					case RDPGFX_CMDID_MAPSURFACETOSCALEDWINDOW:
+					{
+						RDPGFX_MAP_SURFACE_TO_SCALED_WINDOW_PDU* surfaceToScaledWindow =
+						    (RDPGFX_MAP_SURFACE_TO_SCALED_WINDOW_PDU*)message.wParam;
+
+						if ((error =
+						         ps->gfx->MapSurfaceToScaledWindow(ps->gfx, surfaceToScaledWindow)))
+							goto fail;
+
+						break;
+					}
+					case RDPGFX_CMDID_MAPSURFACETOSCALEDOUTPUT:
+					{
+						RDPGFX_MAP_SURFACE_TO_SCALED_OUTPUT_PDU* surfaceToScaledOutput =
+						    (RDPGFX_MAP_SURFACE_TO_SCALED_OUTPUT_PDU*)message.wParam;
+
+						if ((error =
+						         ps->gfx->MapSurfaceToScaledOutput(ps->gfx, surfaceToScaledOutput)))
+							goto fail;
+
+						break;
+					}
 				}
 			}
 		}
