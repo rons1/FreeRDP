@@ -446,6 +446,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						if ((error = ps->gfx->ResetGraphics(
 						         ps->gfx, (RDPGFX_RESET_GRAPHICS_PDU*)message.wParam)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_STARTFRAME:
 					{
@@ -455,12 +456,14 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						if ((error = ps->gfx->StartFrame(ps->gfx,
 						                                 (RDPGFX_START_FRAME_PDU*)message.wParam)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_ENDFRAME:
 					{
 						RDPGFX_END_FRAME_PDU* endFrame = (RDPGFX_END_FRAME_PDU*)message.wParam;
 						if ((error = ps->gfx->EndFrame(ps->gfx, endFrame)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_WIRETOSURFACE_1:
 					{
@@ -468,6 +471,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						RDPGFX_SURFACE_COMMAND* cmd = (RDPGFX_SURFACE_COMMAND*)message.wParam;
 						if ((error = ps->gfx->SurfaceCommand(ps->gfx, cmd)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_DELETEENCODINGCONTEXT:
 					{
@@ -475,6 +479,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						    (RDPGFX_DELETE_ENCODING_CONTEXT_PDU*)message.wParam;
 						if ((error = ps->gfx->DeleteEncodingContext(ps->gfx, pdu)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_CREATESURFACE:
 					{
@@ -482,6 +487,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						    (RDPGFX_CREATE_SURFACE_PDU*)message.wParam;
 						if ((error = ps->gfx->CreateSurface(ps->gfx, createSurface)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_DELETESURFACE:
 					{
@@ -489,12 +495,31 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						    (RDPGFX_DELETE_SURFACE_PDU*)message.wParam;
 						if ((error = ps->gfx->DeleteSurface(ps->gfx, deleteSurface)))
 							goto fail;
+						break;
 					}
 					case RDPGFX_CMDID_SOLIDFILL:
 					{
 						RDPGFX_SOLID_FILL_PDU* solidFill = (RDPGFX_SOLID_FILL_PDU*)message.wParam;
 						if ((error = ps->gfx->SolidFill(ps->gfx, solidFill)))
 							goto fail;
+						break;
+					}
+					case RDPGFX_CMDID_SURFACETOSURFACE:
+					{
+						RDPGFX_SURFACE_TO_SURFACE_PDU* surfaceToSurface =
+						    (RDPGFX_SURFACE_TO_SURFACE_PDU*)message.wParam;
+						RDPGFX_SOLID_FILL_PDU* copy = malloc(sizeof(RDPGFX_SOLID_FILL_PDU));
+						if ((error = ps->gfx->SurfaceToSurface(ps->gfx, surfaceToSurface)))
+							goto fail;
+						break;
+					}
+					case RDPGFX_CMDID_SURFACETOCACHE:
+					{
+						RDPGFX_SURFACE_TO_CACHE_PDU* surfaceToCache =
+						    (RDPGFX_SURFACE_TO_CACHE_PDU*)message.wParam;
+						if ((error = ps->gfx->SurfaceToCache(ps->gfx, surfaceToCache)))
+							goto fail;
+						break;
 					}
 				}
 			}
