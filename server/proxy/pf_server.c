@@ -469,6 +469,33 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						if ((error = ps->gfx->SurfaceCommand(ps->gfx, cmd)))
 							goto fail;
 					}
+					case RDPGFX_CMDID_DELETEENCODINGCONTEXT:
+					{
+						RDPGFX_DELETE_ENCODING_CONTEXT_PDU* pdu =
+						    (RDPGFX_DELETE_ENCODING_CONTEXT_PDU*)message.wParam;
+						if ((error = ps->gfx->DeleteEncodingContext(ps->gfx, pdu)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_CREATESURFACE:
+					{
+						RDPGFX_CREATE_SURFACE_PDU* createSurface =
+						    (RDPGFX_CREATE_SURFACE_PDU*)message.wParam;
+						if ((error = ps->gfx->CreateSurface(ps->gfx, createSurface)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_DELETESURFACE:
+					{
+						RDPGFX_DELETE_SURFACE_PDU* deleteSurface =
+						    (RDPGFX_DELETE_SURFACE_PDU*)message.wParam;
+						if ((error = ps->gfx->DeleteSurface(ps->gfx, deleteSurface)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_SOLIDFILL:
+					{
+						RDPGFX_SOLID_FILL_PDU* solidFill = (RDPGFX_SOLID_FILL_PDU*)message.wParam;
+						if ((error = ps->gfx->SolidFill(ps->gfx, solidFill)))
+							goto fail;
+					}
 				}
 			}
 		}

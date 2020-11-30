@@ -123,6 +123,7 @@ static UINT pf_rdpgfx_surface_command(RdpgfxClientContext* context,
 	*copy = *cmd;
 	copy->data = malloc(cmd->length);
 	CopyMemory(copy->data, cmd->data, cmd->length);
+	copy->extra = NULL;
 	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_WIRETOSURFACE_1, copy, NULL);
 
 	if (!config->DecodeGFX)
@@ -142,8 +143,9 @@ pf_rdpgfx_delete_encoding_context(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->DeleteEncodingContext(server, deleteEncodingContext)))
-		return error;
+	RDPGFX_DELETE_ENCODING_CONTEXT_PDU* copy = malloc(sizeof(RDPGFX_DELETE_ENCODING_CONTEXT_PDU));
+	*copy = *deleteEncodingContext;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_DELETEENCODINGCONTEXT, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -161,8 +163,9 @@ static UINT pf_rdpgfx_create_surface(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->CreateSurface(server, createSurface)))
-		return error;
+	RDPGFX_CREATE_SURFACE_PDU* copy = malloc(sizeof(RDPGFX_CREATE_SURFACE_PDU));
+	*copy = *createSurface;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_CREATESURFACE, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -180,8 +183,9 @@ static UINT pf_rdpgfx_delete_surface(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->DeleteSurface(server, deleteSurface)))
-		return error;
+	RDPGFX_DELETE_SURFACE_PDU* copy = malloc(sizeof(RDPGFX_DELETE_SURFACE_PDU));
+	*copy = *deleteSurface;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_DELETESURFACE, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -199,8 +203,13 @@ static UINT pf_rdpgfx_solid_fill(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->SolidFill(server, solidFill)))
-		return error;
+	RDPGFX_SOLID_FILL_PDU* copy = malloc(sizeof(RDPGFX_SOLID_FILL_PDU));
+	*copy = *solidFill;
+	copy->fillRects = malloc(sizeof(RECTANGLE_16) * copy->fillRectCount);
+	for (size_t i = 0; i < copy->fillRectCount; i++)
+		copy->fillRects[i] = solidFill->fillRects[i];
+
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_SOLIDFILL, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
