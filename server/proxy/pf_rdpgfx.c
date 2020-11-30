@@ -58,12 +58,12 @@ static UINT pf_rdpgfx_reset_graphics(RdpgfxClientContext* context,
 	if (!copy)
 		return CHANNEL_RC_NO_MEMORY;
 
+	*copy = *resetGraphics;
 	copy->monitorDefArray = malloc(sizeof(MONITOR_DEF) * copy->monitorCount);
-	CopyMemory(copy, resetGraphics, sizeof(RDPGFX_RESET_GRAPHICS_PDU));
-	CopyMemory(copy->monitorDefArray, resetGraphics->monitorDefArray, sizeof(MONITOR_DEF) * copy->monitorCount));
+	for (size_t i = 0; i < copy->monitorCount; i++)
+		copy->monitorDefArray[i] = resetGraphics->monitorDefArray[i];
 
 	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_RESETGRAPHICS, copy, NULL);
-
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -81,8 +81,9 @@ static UINT pf_rdpgfx_start_frame(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->StartFrame(server, startFrame)))
-		return error;
+	RDPGFX_START_FRAME_PDU* copy = malloc(sizeof(RDPGFX_START_FRAME_PDU));
+	*copy = *startFrame;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_STARTFRAME, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -98,9 +99,9 @@ static UINT pf_rdpgfx_end_frame(RdpgfxClientContext* context, const RDPGFX_END_F
 	RdpgfxServerContext* server = (RdpgfxServerContext*)pdata->ps->gfx;
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
-
-	if ((error = server->EndFrame(server, endFrame)))
-		return error;
+	RDPGFX_END_FRAME_PDU* copy = malloc(sizeof(RDPGFX_START_FRAME_PDU));
+	*copy = *endFrame;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_ENDFRAME, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -118,8 +119,11 @@ static UINT pf_rdpgfx_surface_command(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->SurfaceCommand(server, cmd)))
-		return error;
+	RDPGFX_SURFACE_COMMAND* copy = malloc(sizeof(RDPGFX_SURFACE_COMMAND));
+	*copy = *cmd;
+	copy->data = malloc(cmd->length);
+	CopyMemory(copy->data, cmd->data, cmd->length);
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_WIRETOSURFACE_1, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;

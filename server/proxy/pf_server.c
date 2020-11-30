@@ -444,7 +444,29 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 						printf("received reset graphics from remote server, passing to peer from "
 						       "server thread\n");
 						if ((error = ps->gfx->ResetGraphics(
-						         server, (RDPGFX_RESET_GRAPHICS_PDU*)message.wParam)))
+						         ps->gfx, (RDPGFX_RESET_GRAPHICS_PDU*)message.wParam)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_STARTFRAME:
+					{
+						printf("received start frame from remote server, passing to peer from "
+						       "server thread\n");
+
+						if ((error = ps->gfx->StartFrame(ps->gfx,
+						                                 (RDPGFX_START_FRAME_PDU*)message.wParam)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_ENDFRAME:
+					{
+						RDPGFX_END_FRAME_PDU* endFrame = (RDPGFX_END_FRAME_PDU*)message.wParam;
+						if ((error = ps->gfx->EndFrame(ps->gfx, endFrame)))
+							goto fail;
+					}
+					case RDPGFX_CMDID_WIRETOSURFACE_1:
+					{
+						printf("prxying surface cmd using server thread\n");
+						RDPGFX_SURFACE_COMMAND* cmd = (RDPGFX_SURFACE_COMMAND*)message.wParam;
+						if ((error = ps->gfx->SurfaceCommand(ps->gfx, cmd)))
 							goto fail;
 					}
 				}
