@@ -51,6 +51,10 @@ static BOOL client_to_proxy_context_new(freerdp_peer* client, pServerContext* co
 	if (!context->vcm || context->vcm == INVALID_HANDLE_VALUE)
 		goto error;
 
+	context->queue = MessageQueue_New(NULL);
+	if (!context->queue)
+		goto error;
+
 	if (!(context->dynvcReady = CreateEvent(NULL, TRUE, FALSE, NULL)))
 		goto error;
 
@@ -77,6 +81,7 @@ error:
 	free(context->vc_handles);
 	context->vc_handles = NULL;
 	HashTable_Free(context->vc_ids);
+	MessageQueue_Free(context->queue);
 	context->vc_ids = NULL;
 	return FALSE;
 }

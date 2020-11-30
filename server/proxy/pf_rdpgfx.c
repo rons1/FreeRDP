@@ -54,8 +54,16 @@ static UINT pf_rdpgfx_reset_graphics(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->ResetGraphics(server, resetGraphics)))
-		return error;
+	RDPGFX_RESET_GRAPHICS_PDU* copy = malloc(sizeof(RDPGFX_RESET_GRAPHICS_PDU));
+	if (!copy)
+		return CHANNEL_RC_NO_MEMORY;
+
+	copy->monitorDefArray = malloc(sizeof(MONITOR_DEF) * copy->monitorCount);
+	CopyMemory(copy, resetGraphics, sizeof(RDPGFX_RESET_GRAPHICS_PDU));
+	CopyMemory(copy->monitorDefArray, resetGraphics->monitorDefArray, sizeof(MONITOR_DEF) * copy->monitorCount));
+
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_RESETGRAPHICS, copy, NULL);
+
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;

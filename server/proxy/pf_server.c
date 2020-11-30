@@ -405,6 +405,7 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 		eventHandles[eventCount++] = ChannelEvent;
 		eventHandles[eventCount++] = pdata->abort_event;
 		eventHandles[eventCount++] = WTSVirtualChannelManagerGetEventHandle(ps->vcm);
+		eventHandles[eventCount++] = MessageQueue_Event(ps->queue);
 		status = WaitForMultipleObjects(eventCount, eventHandles, FALSE, INFINITE);
 
 		if (status == WAIT_FAILED)
@@ -422,6 +423,31 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 			{
 				WLog_ERR(TAG, "WTSVirtualChannelManagerCheckFileDescriptor failure");
 				goto fail;
+			}
+		}
+
+		if (WaitForSingleObject(MessageQueue_Event(ps->queue), 0) == WAIT_OBJECT_0)
+		{
+			wMessage message;
+			UINT error;
+			while (MessageQueue_Peek(ps->queue, &message, TRUE))
+			{
+				if (message.id == WMQ_QUIT)
+				{
+					break;
+				}
+
+				switch (message.id)
+				{
+					case RDPGFX_CMDID_RESETGRAPHICS:
+					{
+						printf("received reset graphics from remote server, passing to peer from "
+						       "server thread\n");
+						if ((error = ps->gfx->ResetGraphics(
+						         server, (RDPGFX_RESET_GRAPHICS_PDU*)message.wParam)))
+							goto fail;
+					}
+				}
 			}
 		}
 

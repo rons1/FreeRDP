@@ -43,7 +43,7 @@ if(FREERDP_VENDOR AND WITH_CLIENT)
 				add_subdirectory(iOS)
 			endif()
 		else()
-			add_subdirectory(Mac)
+			#add_subdirectory(Mac)
 		endif()
 	endif()
 

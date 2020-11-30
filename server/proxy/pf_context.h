@@ -59,8 +59,9 @@ struct p_server_context
 	CliprdrServerContext* cliprdr;
 	RdpsndServerContext* rdpsnd;
 
-	HANDLE* vc_handles; /* static virtual channels open handles */
-	wHashTable* vc_ids; /* channel_name -> channel_id map */
+	HANDLE* vc_handles;   /* static virtual channels open handles */
+	wHashTable* vc_ids;   /* channel_name -> channel_id map */
+	wMessageQueue* queue; /* message queue to process data from proxy client */
 };
 typedef struct p_server_context pServerContext;
 
