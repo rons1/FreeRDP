@@ -521,6 +521,24 @@ static DWORD WINAPI pf_server_handle_peer(LPVOID arg)
 							goto fail;
 						break;
 					}
+					case RDPGFX_CMDID_CACHETOSURFACE:
+					{
+						RDPGFX_CACHE_TO_SURFACE_PDU* cacheToSurface =
+						    (RDPGFX_CACHE_TO_SURFACE_PDU*)message.wParam;
+
+						if ((error = ps->gfx->CacheToSurface(ps->gfx, cacheToSurface)))
+							goto fail;
+						break;
+					}
+					case RDPGFX_CMDID_MAPSURFACETOOUTPUT:
+					{
+						RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU* surfaceToOutput =
+						    (RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU*)message.wParam;
+
+						if ((error = ps->gfx->MapSurfaceToOutput(ps->gfx, surfaceToOutput)))
+							goto fail;
+						break;
+					}
 				}
 			}
 		}

@@ -271,8 +271,12 @@ static UINT pf_rdpgfx_cache_to_surface(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->CacheToSurface(server, cacheToSurface)))
-		return error;
+	RDPGFX_CACHE_TO_SURFACE_PDU* copy = malloc(sizeof(RDPGFX_CACHE_TO_SURFACE_PDU));
+	*copy = *cacheToSurface;
+	copy->destPts = malloc(sizeof(RECTANGLE_16) * copy->destPtsCount);
+	for (size_t i = 0; i < copy->destPtsCount; i++)
+		copy->destPts[i] = cacheToSurface->destPts[i];
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_CACHETOSURFACE, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
@@ -318,8 +322,9 @@ static UINT pf_rdpgfx_map_surface_to_output(RdpgfxClientContext* context,
 	RdpgfxClientContext* gfx_decoder = pdata->pc->gfx_decoder;
 	WLog_VRB(TAG, __FUNCTION__);
 
-	if ((error = server->MapSurfaceToOutput(server, surfaceToOutput)))
-		return error;
+	RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU* copy = malloc(sizeof(RDPGFX_MAP_SURFACE_TO_OUTPUT_PDU));
+	*copy = *surfaceToOutput;
+	MessageQueue_Post(pdata->ps->queue, NULL, RDPGFX_CMDID_MAPSURFACETOOUTPUT, copy, NULL);
 
 	if (!config->DecodeGFX)
 		return CHANNEL_RC_OK;
