@@ -32,6 +32,11 @@
 #include <freerdp/log.h>
 #include <freerdp/error.h>
 #include <freerdp/utils/ringbuffer.h>
+#include <uwsc/uwsc.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "rdg.h"
 #include "../proxy.h"
@@ -124,6 +129,9 @@ struct rdp_rdg
 	int timeout;
 	UINT16 extAuth;
 	UINT16 reserved2;
+
+	struct uwsc_client* ws_client;
+	HANDLE ws_thread;
 };
 
 enum
@@ -1280,12 +1288,103 @@ static BOOL rdg_tunnel_connect(rdpRdg* rdg)
 	return TRUE;
 }
 
+
+static void uwsc_onopen(struct uwsc_client *cl)
+{
+    uwsc_log_info("websocket connection established\n");
+}
+
+static void uwsc_onmessage(struct uwsc_client *cl,
+	void *data, size_t len, bool binary)
+{
+    printf("Recv:");
+
+    if (binary) {
+        size_t i;
+        uint8_t *p = data;
+
+        for (i = 0; i < len; i++) {
+            printf("%02hhX ", p[i]);
+            if (i % 16 == 0 && i > 0)
+                puts("");
+        }
+        puts("");
+    } else {
+        printf("[%.*s]\n", (int)len, (char *)data);
+    }
+}
+
+static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
+{
+    uwsc_log_err("onerror:%d: %s\n", err, msg);
+    ev_break(cl->loop, EVBREAK_ALL);
+}
+
+static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
+{
+    uwsc_log_err("onclose:%d: %s\n", code, reason);
+    ev_break(cl->loop, EVBREAK_ALL);
+}
+
+static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
+{
+    if (w->signum == SIGINT) {
+        ev_break(loop, EVBREAK_ALL);
+        uwsc_log_info("Normal quit\n");
+    }
+}
+
+static DWORD WINAPI websocket_mainloop_thread_func(LPVOID arg)
+{
+	rdpRdg* rdg = (rdpRdg*)arg;
+    struct ev_loop *loop = EV_DEFAULT;
+    struct ev_signal signal_watcher;
+	int ping_interval = 10;	/* second */
+    struct uwsc_client *cl;
+	int opt;
+
+	char* url = malloc(300);
+	strncpy(url, rdg->settings->GatewayHostname, strlen(rdg->settings->GatewayHostname));
+	strncpy(url, "/remoteDesktopGateway/", strlen("/remoteDesktopGateway/"));
+
+   	cl = rdg->ws_client = uwsc_new(loop, url, ping_interval, NULL);
+    if (!cl)
+        return -1;
+
+	uwsc_log_info("Start connect...\n");
+
+    cl->onopen = uwsc_onopen;
+    cl->onmessage = uwsc_onmessage;
+    cl->onerror = uwsc_onerror;
+    cl->onclose = uwsc_onclose;
+
+    ev_signal_init(&signal_watcher, signal_cb, SIGINT);
+    ev_signal_start(loop, &signal_watcher);
+
+    ev_run(loop, 0);
+
+    free(cl);
+    
+    return 0;
+}
+
+static void rdg_connect_websocket(rdpRdg* rdg, const char* url)
+{
+	if (!(rdg->ws_thread = 
+		CreateThread(NULL, 0, websocket_mainloop_thread_func, (void*)rdg, 0, NULL)))
+	{
+		WLog_ERR(TAG, "CreateThread failed!");
+		// TODO error handling
+	}
+}
+
 BOOL rdg_connect(rdpRdg* rdg, DWORD timeout, BOOL* rpcFallback)
 {
 	BOOL status;
 	SOCKET outConnSocket = 0;
 	char* peerAddress = NULL;
 	assert(rdg != NULL);
+	rdg_connect_websocket(rdg, "fuck");
 	status =
 	    rdg_establish_data_connection(rdg, rdg->tlsOut, "RDG_OUT_DATA", NULL, timeout, rpcFallback);
 
@@ -1765,6 +1864,79 @@ static int rdg_bio_free(BIO* bio)
 {
 	WINPR_UNUSED(bio);
 	return 1;
+}
+
+static int rdg_ws_bio_write(BIO* bio, const char* buf, int num)
+{
+	int status;
+	rdpRdg* rdg = (rdpRdg*)BIO_get_data(bio);
+	BIO_clear_flags(bio, BIO_FLAGS_WRITE);
+	EnterCriticalSection(&rdg->writeSection);
+	// TODO: write websocket binary message here
+	// status = rdg_write_data_packet(rdg, (const BYTE*)buf, num);
+	LeaveCriticalSection(&rdg->writeSection);
+
+	if (status < 0)
+	{
+		BIO_clear_flags(bio, BIO_FLAGS_SHOULD_RETRY);
+		return -1;
+	}
+	else if (status < num)
+	{
+		BIO_set_flags(bio, BIO_FLAGS_WRITE);
+		WSASetLastError(WSAEWOULDBLOCK);
+	}
+	else
+	{
+		BIO_set_flags(bio, BIO_FLAGS_WRITE);
+	}
+
+	return status;
+}
+
+static int rdg_ws_bio_read(BIO* bio, char* buf, int size)
+{
+	int status;
+	rdpRdg* rdg = (rdpRdg*)BIO_get_data(bio);
+	//status = rdg_read_data_packet(rdg, (BYTE*)buf, size);
+
+	if (status < 0)
+	{
+		BIO_clear_retry_flags(bio);
+		return -1;
+	}
+	else if (status == 0)
+	{
+		BIO_set_retry_read(bio);
+		WSASetLastError(WSAEWOULDBLOCK);
+		return -1;
+	}
+	else
+	{
+		BIO_set_flags(bio, BIO_FLAGS_READ);
+	}
+
+	return status;
+}
+static BIO_METHOD* bio_websocket_rdg(void)
+{
+	static BIO_METHOD* bio_methods = NULL;
+
+	if (bio_methods == NULL)
+	{
+		if (!(bio_methods = BIO_meth_new(BIO_TYPE_TSG, "RDGateway_WVD_WS")))
+			return NULL;
+
+		BIO_meth_set_write(bio_methods, rdg_ws_bio_write);
+		BIO_meth_set_read(bio_methods, rdg_ws_bio_read);
+		BIO_meth_set_puts(bio_methods, rdg_bio_puts);
+		BIO_meth_set_gets(bio_methods, rdg_bio_gets);
+		BIO_meth_set_ctrl(bio_methods, rdg_bio_ctrl);
+		BIO_meth_set_create(bio_methods, rdg_bio_new);
+		BIO_meth_set_destroy(bio_methods, rdg_bio_free);
+	}
+
+	return bio_methods;
 }
 
 static BIO_METHOD* BIO_s_rdg(void)

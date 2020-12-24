@@ -89,6 +89,10 @@ if (WITH_CAIRO)
     find_package(Cairo REQUIRED)
 endif(WITH_CAIRO)
 
+find_package(uwsc REQUIRED)
+freerdp_library_add(${LIBUWSC_LIBRARY})
+freerdp_include_directory_add(${LIBUWSC_INCLUDE_DIR})
+
 # Prefer SWScale over Cairo, both at the same time are not possible.
 if (WITH_SWSCALE)
     add_definitions(-DSWSCALE_FOUND=1)
@@ -240,6 +244,7 @@ if(WITH_FFMPEG)
     freerdp_library_add(${FFMPEG_LIBRARIES})
 endif()
 
+freerdp_library_add(${LIBEV_LIBRARY})
 if(WIN32 AND WITH_MEDIA_FOUNDATION)
     set(CODEC_SRCS ${CODEC_SRCS} codec/h264_mf.c)
 endif()
@@ -387,7 +392,6 @@ set_target_properties(${MODULE_NAME} PROPERTIES OUTPUT_NAME ${MODULE_NAME}${FREE
 if (WITH_LIBRARY_VERSIONING)
     set_target_properties(${MODULE_NAME} PROPERTIES VERSION ${FREERDP_VERSION} SOVERSION ${FREERDP_API_VERSION})
 endif()
-
 
 target_link_libraries(${MODULE_NAME} ${PRIVATE_KEYWORD} ${LIBFREERDP_LIBS} winpr)
 

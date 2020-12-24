@@ -142,6 +142,7 @@ if(WIN32)
 	freerdp_library_add(ws2_32)
 endif()
 
+
 freerdp_library_add(${OPENSSL_LIBRARIES})
 
 if(WITH_GSSAPI)
