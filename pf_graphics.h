@@ -2,7 +2,9 @@
  * FreeRDP: A Remote Desktop Protocol Implementation
  * FreeRDP Proxy Server
  *
+ * Copyright 2019 Mati Shabtay <matishabtay@gmail.com>
  * Copyright 2019 Kobi Mizrachi <kmizrachi18@gmail.com>
+ * Copyright 2019 Idan Freiberg <speidy@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +19,13 @@
  * limitations under the License.
  */
 
-#ifndef FREERDP_SERVER_PROXY_RDPSND_H
-#define FREERDP_SERVER_PROXY_RDPSND_H
+#ifndef FREERDP_SERVER_PROXY_PFGRAPHICS_H
+#define FREERDP_SERVER_PROXY_PFGRAPHICS_H
 
-#include <freerdp/client/rdpsnd.h>
-#include <freerdp/server/rdpsnd.h>
+#include <freerdp/freerdp.h>
+#include "pf_client.h"
 
-#include "pf_context.h"
+BOOL pf_register_pointer(rdpGraphics* graphics);
+BOOL pf_register_graphics(rdpGraphics* graphics);
 
-BOOL pf_server_rdpsnd_init(pServerContext* ps);
-void pf_server_rdpsnd_free(pServerContext* ps);
-
-#endif /* FREERDP_SERVER_PROXY_RDPSND_H */
+#endif /* FREERDP_SERVER_PROXY_PFGRAPHICS_H */

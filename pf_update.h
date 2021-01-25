@@ -19,23 +19,16 @@
  * limitations under the License.
  */
 
-#ifndef FREERDP_SERVER_PROXY_PFCHANNELS_H
-#define FREERDP_SERVER_PROXY_PFCHANNELS_H
+#ifndef FREERDP_SERVER_PROXY_PFUPDATE_H
+#define FREERDP_SERVER_PROXY_PFUPDATE_H
 
 #include <freerdp/freerdp.h>
-#include <freerdp/client/channels.h>
+#include <freerdp/gdi/gdi.h>
+#include <freerdp/gdi/bitmap.h>
 
 #include "pf_context.h"
 
-void pf_channels_on_client_channel_connect(void* context, ChannelConnectedEventArgs* e);
-void pf_channels_on_client_channel_disconnect(void* context, ChannelDisconnectedEventArgs* e);
-BOOL pf_channels_client_passthrough_channels_init(pClientContext* pc);
-BOOL pf_channels_handle_passthrough_channel_data(proxyData* pdata, BOOL serverMode,
-                                                 UINT16 channel_id, const char* channel_name,
-                                                 const BYTE* data, size_t size, UINT32 flags,
-                                                 size_t totalSize);
+void pf_server_register_update_callbacks(rdpUpdate* update);
+void pf_client_register_update_callbacks(rdpUpdate* update);
 
-BOOL pf_server_channels_init(pServerContext* ps);
-void pf_server_channels_free(pServerContext* ps);
-
-#endif /* FREERDP_SERVER_PROXY_PFCHANNELS_H */
+#endif /* FREERDP_SERVER_PROXY_PFUPDATE_H */

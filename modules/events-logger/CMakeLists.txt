@@ -17,13 +17,13 @@
 # limitations under the License.
 #
 
-set(PLUGIN_NAME "proxy-router-plugin")
+set(PLUGIN_NAME "proxy-events-logger-plugin")
 
 add_library(${PLUGIN_NAME} MODULE
-	router.cpp
+	logger.cpp
 )
 
-set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_STANDARD 17)
+set_target_properties(${PLUGIN_NAME} PROPERTIES CXX_STANDARD 11)
 set_target_properties(${PLUGIN_NAME} PROPERTIES PREFIX "")
 set_target_properties(${PLUGIN_NAME} PROPERTIES NO_SONAME 1)
 set_target_properties(${PLUGIN_NAME} PROPERTIES
