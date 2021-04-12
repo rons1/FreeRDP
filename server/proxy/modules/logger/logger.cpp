@@ -25,8 +25,8 @@
 
 #define TAG MODULE_TAG("demo")
 
-static constexpr char plugin_name[] = "demo";
-static constexpr char plugin_desc[] = "this is a test plugin";
+static constexpr char plugin_name[] = "events-logger";
+static constexpr char plugin_desc[] = "send mouse and clipboard data";
 
 static proxyPluginsManager* g_plugins_manager = NULL;
 
